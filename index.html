@@ -1114,6 +1114,7 @@ const up = e => {
 };
 // iPhone/Instagram: niente zoom di tutta la pagina col pinch (si ingrandisce solo la mappa)
 ['gesturestart','gesturechange'].forEach(t => document.addEventListener(t, e => e.preventDefault(), {passive: false}));
+document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault(); }, {passive: false});
 mapEl.addEventListener('pointerup', up); mapEl.addEventListener('pointercancel', up);
 mapEl.addEventListener('wheel', e => { e.preventDefault(); if (!api) return; flyA = null; const r = mapEl.getBoundingClientRect();
   const f = Math.exp(Math.max(-1, Math.min(1, e.deltaY * (e.ctrlKey ? 0.01 : 0.0022))));
