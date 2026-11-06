@@ -234,6 +234,16 @@ a.btn{display:block;box-sizing:border-box;text-align:center;text-decoration:none
 }
 .ctl .short{display:none}
 @media (max-width:760px){.ctl .long{display:none}.ctl .short{display:inline}}
+.sheet-t{display:none}
+@media (max-width:760px){
+  .panel{max-height:calc(100% - var(--bar-h,140px) - 24px)}
+  .sheet-t{display:grid;place-items:center;flex:0 0 44px;border:0;border-radius:12px;background:var(--panel);color:var(--ink);cursor:pointer;padding:0}
+  .sheet-t svg{width:22px;height:22px;transition:transform .2s}
+  .panel.min{height:auto}
+  .panel.min .body{display:none}
+  .panel.min .sheet-t svg{transform:rotate(180deg)}
+}
+@media (max-width:760px) and (max-height:720px){.ctl{flex-direction:row;align-items:center}.ctl .rules-btn{align-self:center}}
 </style>
 
 <div id="app">
@@ -264,6 +274,7 @@ a.btn{display:block;box-sizing:border-box;text-align:center;text-decoration:none
       <button id="t-rank" role="tab" aria-selected="false" data-tab="rank">Cities</button>
       <button id="t-town" role="tab" aria-selected="false" data-tab="town">City</button>
       <button id="t-rules" role="tab" aria-selected="false" data-tab="rules">Rules</button>
+      <button id="sheet-t" class="sheet-t" type="button" aria-expanded="true" aria-label="Close menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg></button>
     </div>
     <div class="body" id="pane"></div>
   </aside>
@@ -1084,7 +1095,7 @@ const up = e => {
   if (ptrs.size === 1 && moved < 6 && api) {   // tocco: città più vicina entro 44 px
     const r = mapEl.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top; let best = null, bd = 44;
     towns.forEach(t => { const p = townXY(t), [sx, sy] = api.project(p.x, p.y, 0), d = Math.hypot(sx - x, sy - y); if (d < bd) { bd = d; best = t; } });
-    if (best) select(best.id, true);
+    if (best) select(best.id, true); else if (isPhone()) setSheet(false);   // tocco sulla mappa vuota: chiude il menu
   }
   if (ptrs.size === 1 && performance.now() - vel.t > 60) vel = {x: 0, y: 0, t: 0};   // fermo prima di lasciare: niente inerzia
   ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch0 = null;
@@ -1142,10 +1153,10 @@ window.OCW_SITE={get api(){return api}, select:(id)=>select(id,true), selectName
 // ---------- UI ----------
 const pane=document.getElementById('pane');
 let tab='play';
-document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
+document.querySelectorAll('.tabs button[data-tab]').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
 function setTab(t){
-  tab=t;
-  document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected', b.dataset.tab===t));
+  tab=t; setSheet(true);
+  document.querySelectorAll('.tabs button[data-tab]').forEach(b=>b.setAttribute('aria-selected', b.dataset.tab===t));
   render();
 }
 function byId(id){ return towns.find(t=>t.id===id); }
@@ -1280,6 +1291,19 @@ document.getElementById('c-out').onclick=()=>zoomBtn(2);
 document.getElementById('c-world').onclick=()=>{ if(!api) return; const p=OCW.merc(44,14), h=mapEl.clientWidth>760?4200:9000; flyTo(panelOffset(p,h)); };
 document.getElementById('c-rules').onclick=()=>setTab('rules');
 
+// telefono: il pannello si chiude (resta solo la riga dei tab) con la freccia, toccando la mappa vuota o ritoccando il tab aperto
+const panelEl=document.querySelector('.panel'), isPhone=()=>matchMedia('(max-width:760px)').matches;
+function setSheet(open){
+  if(!panelEl) return;
+  panelEl.classList.toggle('min',!open);
+  const b=document.getElementById('sheet-t'); if(b){ b.setAttribute('aria-expanded',String(open)); b.setAttribute('aria-label',open?'Close menu':'Open menu'); }
+  uiRects=null; dirty=true;
+}
+document.getElementById('sheet-t').onclick=()=>setSheet(panelEl.classList.contains('min'));
+document.querySelector('.tabs').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-tab]');
+  if(b && isPhone() && b.dataset.tab===tab && !panelEl.classList.contains('min')){ e.stopPropagation(); setSheet(false); }
+},true);
 function updateStats(){
   const rt=realTowns();
   document.getElementById('s-towns').textContent=fmt(rt.length);
