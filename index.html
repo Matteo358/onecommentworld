@@ -256,6 +256,7 @@ body,#labels .lbl{touch-action:none}
 .egg-call{display:block;width:100%;text-align:left;cursor:pointer;border:1px solid #f5c542;font:inherit;color:inherit}
 .egg-pin{font-style:normal;font-size:20px;margin-right:4px;filter:drop-shadow(0 2px 6px rgba(240,190,40,.8))}
 .egg-b{font-size:12px}
+.egg-f{display:flex;gap:8px;margin:10px 0 4px}.egg-f input{flex:1;min-width:0;height:48px;border-radius:12px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);font:700 18px var(--body);padding:0 12px;letter-spacing:.05em}.egg-f .btn{width:auto;flex:none;margin:0}
 </style>
 
 <div id="app">
@@ -2382,25 +2383,25 @@ let preview=null;
 // ---------- easter egg (Golden Egg hunt) ----------
 // La risposta non è nel sito: il posto e il codice sono cifrati (AES-GCM, chiave PBKDF2 dal nome del posto).
 // Si sblocca solo scrivendo la risposta giusta nella ricerca. Crea l'uovo: easter_egg/crea_uovo.py (project files).
-const EGG={"n": 1, "iter": 150000, "salt": "12424213818ca068a43ed98d835370da", "iv": "51cfa5f1bd22d77e62516454", "ct": "494e1e2c27c50bd0419b89a05c49d325e066608e815cef0c04ca583c884f93221d8b00a84dec65247736b7c09e5f9cdf15636e36eacfb4f9ecfc6195dfe759a284a6dd8c406c4c16884d21ec3227eaebde032f27129796e735e68b0602fe07c4f8"};
+const EGG={"n": 1, "iter": 150000, "salt": "b048b7b67904ea243ca29e6dfc23d37d", "iv": "8c9dda0de3905b2d4d204097", "ct": "c71d518ffff4fb0ee1decf4f064c53e89242ae60b63003eaa808bb3efb8388f2ab909e83c82a993be45aefeec8cf737d62f4f950b157dffd27e03718a8516b8fac63f8032316267e52c52bd52ca8c0a710a471cfe88ed4b38be48d939d44922b815f7f5b0e64eb78a128d8c269f58cf2c39dce8393d006e579c6242fb70cd45204efda115396584fd8ab7fcf3d810a7c41f519d07da5b20711abee0002b10eca57f64ccf1af6f9932e9ee00b3eeb94776d83cabb498b3329032254d56e35d5b0c5958c9d7a5a63865055fa9d94e98f1761fb009ba1cff06935a891fb6bacd5a5b0d8ec24792675e035f344c7993dd7cae17b0bba07281636ac300c172c568cb55fde8e0b545333133e45551afb709a6f9aef01a3cc4520a1c061424aefd511051f7b084819029c748cdd8d0694c32dacd26747e2fee9f3f6e787a8742f4533a830"};
 const EGG_WINNERS=[];   // [{n:1,user:"@x",city:"..."}]: badge Egg Hunter
 const EGG_W=new Set(EGG_WINNERS.map(w=>w.user.toLowerCase()));
 const eggBadge=u=>EGG_W.has(String(u).toLowerCase())?' <span class="egg-b" title="Egg Hunter">🥚</span>':'';
 const eggTried=new Map(); let eggTown=null, eggData=null;
 const hexB=h=>new Uint8Array(h.match(/../g).map(x=>parseInt(x,16)));
-const eggNorm=s=>s.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();
+const eggNorm=s=>String(s).toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();
+async function eggDec(blob,secret){
+  try{
+    const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),'PBKDF2',false,['deriveKey']);
+    const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:hexB(blob.salt),iterations:EGG.iter,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['decrypt']);
+    const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:hexB(blob.iv)},key,hexB(blob.ct));
+    return JSON.parse(new TextDecoder().decode(pt));
+  }catch(e){ return null; }
+}
 async function eggOpen(cand){
   if(!EGG||!cand||cand.length<3||!(window.crypto&&crypto.subtle)) return null;
   if(eggTried.has(cand)) return eggTried.get(cand);
-  const p=(async()=>{
-    try{
-      const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(cand),'PBKDF2',false,['deriveKey']);
-      const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:hexB(EGG.salt),iterations:EGG.iter,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['decrypt']);
-      const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:hexB(EGG.iv)},key,hexB(EGG.ct));
-      return JSON.parse(new TextDecoder().decode(pt));
-    }catch(e){ return null; }
-  })();
-  eggTried.set(cand,p); return p;
+  const p=eggDec(EGG,cand); eggTried.set(cand,p); return p;
 }
 async function eggTry(raw, deep){
   if(eggData) return !!eggTown;
@@ -2419,11 +2420,32 @@ function eggFound(d){
 }
 function renderEgg(){
   const d=eggData;
+  if(!d.code){
+    pane.innerHTML=`
+      <div class="egg-hero">
+        <div class="egg-ico" aria-hidden="true">🥚🔒</div>
+        <div class="eyebrow">Golden Egg #${EGG.n} · ${esc(d.name)}</div>
+        <h2 class="town-name">You found the egg!</h2>
+        <p class="meta">${esc(d.q)}</p>
+      </div>
+      <form id="egg-f" class="egg-f" autocomplete="off">
+        <input id="egg-k" type="text" inputmode="text" placeholder="Final key" aria-label="Final key">
+        <button class="btn" type="submit">Open the egg</button>
+      </form>
+      <p class="hint" id="egg-msg">One key, one try at a time. Shhh: don't post the answer in the comments 🤫</p>`;
+    pane.querySelector('#egg-f').onsubmit=async e=>{
+      e.preventDefault(); const v=eggNorm(pane.querySelector('#egg-k').value); const m=pane.querySelector('#egg-msg');
+      if(!v) return; m.textContent='Checking…';
+      const r=await eggDec(d.lock,v);
+      if(r&&r.code){ d.code=r.code; renderEgg(); } else { m.textContent='Not the right key. Keep searching 🔎'; }
+    };
+    return;
+  }
   pane.innerHTML=`
     <div class="egg-hero">
       <div class="egg-ico" aria-hidden="true">🥚</div>
       <div class="eyebrow">Golden Egg #${EGG.n} · ${esc(d.name)}</div>
-      <h2 class="town-name">You found it!</h2>
+      <h2 class="town-name">You opened it!</h2>
       <p class="meta">Your secret code:</p>
       <div class="egg-code" id="egg-code">${esc(d.code)}</div>
     </div>
@@ -2445,8 +2467,8 @@ function eggRules(){
   const w=EGG_WINNERS.filter(x=>x.n===EGG.n);
   return `<div class="sec egg-sec"><h3>🥚 Golden Egg hunt #${EGG.n}</h3>
     <p class="hint">A golden egg is hidden somewhere on this map. There are 3 clues: <b>#1</b> is in the Day 11 reel, <b>#2</b> in its caption, and <b>#3</b> is right here:</p>
-    <p class="egg-clue">“Its name comes from an American businessman.”</p>
-    <p class="hint">Put the 3 clues together and type the town in the search bar. Find the egg, get the secret code, send it in DM to @onecommentworld. First follower wins <b>$5</b> + the <b>Egg Hunter 🥚</b> badge on their house. More eggs are coming.</p>
+    <p class="egg-clue">“Half of its name is a man. The other half means ‘the town’.”</p>
+    <p class="hint">Put the 3 clues together and type the town in the search bar. The egg is locked: crack the last key, get the secret code and send it in DM to @onecommentworld. First follower wins <b>$5</b> + the <b>Egg Hunter 🥚</b> badge on their house. More eggs are coming.</p>
     <h3 style="margin-top:12px">Egg Hunters</h3>
     ${w.length?`<div class="chips">${w.map(x=>`<span class="chip f">🥚 ${esc(x.user)} · ${esc(x.city)}</span>`).join('')}</div>`:'<p class="hint">Nobody yet. Be the first.</p>'}
   </div>`;
