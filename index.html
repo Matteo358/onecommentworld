@@ -248,6 +248,14 @@ a.btn{display:block;box-sizing:border-box;text-align:center;text-decoration:none
 body,#labels .lbl{touch-action:none}
 .panel .body,#results{touch-action:pan-y}
 .ctl{pointer-events:none}.ctl button{pointer-events:auto}
+
+.egg-hero{text-align:center}
+.egg-ico{font-size:56px;line-height:1;margin:4px 0 8px;filter:drop-shadow(0 4px 10px rgba(240,190,40,.55))}
+.egg-code{font:800 26px/1.2 var(--body);letter-spacing:.08em;color:#1b1400;background:linear-gradient(135deg,#ffe58a,#f5c542 55%,#e0a91f);border-radius:14px;padding:14px 10px;margin:8px 0 4px;user-select:all}
+.egg-clue{font:700 16px/1.4 var(--body);color:var(--ink);background:var(--panel-2);border-left:4px solid #f5c542;border-radius:8px;padding:10px 12px;margin:8px 0}
+.egg-call{display:block;width:100%;text-align:left;cursor:pointer;border:1px solid #f5c542;font:inherit;color:inherit}
+.egg-pin{font-style:normal;font-size:20px;margin-right:4px;filter:drop-shadow(0 2px 6px rgba(240,190,40,.8))}
+.egg-b{font-size:12px}
 </style>
 
 <div id="app">
@@ -381,7 +389,7 @@ Mantua	10753</script>
 (function(){
 // ---------- dati: città vere dai commenti (aggiornare ogni Day) ----------
 const DAY = 11;
-const MAYOR_AT = 10;          // cittadini per votare il sindaco
+const MAYOR_AT = 30;          // cittadini per votare il sindaco
 const COUNTRY_AT = 3;         // sindaci in una nazione per votare il presidente
 const WORLD_AT = 3;           // presidenti nazionali per il presidente del mondo
 const IG = 'https://www.instagram.com/onecommentworld/';
@@ -1882,7 +1890,7 @@ function buildLabels(){
   towns.forEach(t => {
     const b = document.createElement('button');
     b.className = 'lbl' + (t.ghost ? ' ghost' : t.abitanti < 30 ? ' small' : '') + (t.id === selectedId ? ' sel' : '');
-    b.innerHTML = (t.sindaco ? CROWN : '') + '<span>' + esc(t.nome) + (t.preview ? ' · free' : '') + '</span>' + (t.ghost ? '' : '<span class="n">' + t.abitanti + '</span>');
+    b.innerHTML = (t.egg ? '<i class="egg-pin">🥚</i>' : '') + (t.sindaco ? CROWN : '') + '<span>' + esc(t.nome) + (t.egg ? '' : t.preview ? ' · free' : '') + '</span>' + (t.ghost ? '' : '<span class="n">' + t.abitanti + '</span>');
     b.addEventListener('click', () => select(t.id, true));
     labelsEl.appendChild(b); labelEls[t.id] = b;
   });
@@ -2098,13 +2106,16 @@ function renderPlay(){
       <li><div><b>Comment your city</b> under the latest reel.</div></li>
       <li><div>You get <b>your own house</b> in your real city.</div></li>
     </ol>
+    ${EGG&&!EGG_WINNERS.some(x=>x.n===EGG.n)?`<button class="callout egg-call" id="to-egg">🥚 <b>A golden egg is hidden on this map.</b> First to find it wins $5. Clue #3 is in Rules.</button>`:''}
     ${IG_BTN}
     <button class="btn ghost" id="to-rules">${ico("M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z M5 17a3 3 0 0 1 3-3h11")}Rules & levels</button>`;
   pane.querySelector('#to-rules').onclick=()=>setTab('rules');
+  const te=pane.querySelector('#to-egg'); if(te) te.onclick=()=>setTab('rules');
 }
 
 function renderTown(){
   const t=byId(selectedId);
+  if(t&&t.egg) return renderEgg(t);
   if(t&&t.preview) return renderFree(t);
   if(!t||t.ghost){ pane.innerHTML='<p class="hint">Tap a city on the map, or pick one from the Cities tab.</p>'; return; }
   const n=t.abitanti, L=lvOf(n), N=nextLv(n), prev=L[1];
@@ -2125,7 +2136,7 @@ function renderTown(){
       <div class="progress"><i style="width:${Math.max(6,(n-prev)/(N[1]-prev)*100)}%"></i></div>
       <p class="hint"><b>${N[1]-n} more</b> ${N[1]-n===1?'citizen':'citizens'}. ${N[3]}</p></div>`:''}
     <div class="sec"><h3>Houses</h3>
-      <div class="chips">${shown.map((u,i)=>`<span class="chip${i===0?' f':''}">${i===0?'★ ':''}${esc(u)}</span>`).join('')}${people.length>shown.length?`<span class="chip">+${people.length-shown.length}</span>`:''}</div>
+      <div class="chips">${shown.map((u,i)=>`<span class="chip${i===0?' f':''}">${i===0?'★ ':''}${esc(u)}${eggBadge(u)}</span>`).join('')}${people.length>shown.length?`<span class="chip">+${people.length-shown.length}</span>`:''}</div>
     </div>
     <div class="callout">Live here? Comment <b>${esc(t.nome)}</b> under the latest reel. Next upgrade vote at <b>${nextUp} citizens</b>.</div>
     ${IG_BTN}`;
@@ -2153,7 +2164,7 @@ function renderRules(){
       <ul class="roles">
         <li><span class="badge f">★</span><div><b>Founder</b><span>The first person who comments a city. Builds the first house.</span></div></li>
         <li><span class="badge">@</span><div><b>Citizens</b><span>Everyone after that. Each citizen gets their own house.</span></div></li>
-        <li><span class="badge m">${CROWN}</span><div><b>Mayor</b><span>Voted by the citizens once the city has ${MAYOR_AT}.</span></div></li>
+        <li><span class="badge m">${CROWN}</span><div><b>Mayor</b><span>Voted by the citizens once the city has ${MAYOR_AT} citizens.</span></div></li>
       </ul>
     </div>
     <div class="sec"><h3>Levels</h3>
@@ -2164,6 +2175,7 @@ function renderRules(){
       <div class="tiles">${UPGRADES.map(u=>`<div class="tile">${ico(u[1])}<b>${u[0]}</b></div>`).join('')}</div>
       <p class="demo-note">Voting opens soon. The list can still change.</p>
     </div>
+    ${eggRules()}
     <div class="callout"><b>Cities and towns only.</b> Countries and regions don't count.</div>`;
 }
 
@@ -2354,6 +2366,84 @@ document.addEventListener('keydown',e=>{
 });
 
 let preview=null;
+// ---------- easter egg (Golden Egg hunt) ----------
+// La risposta non è nel sito: il posto e il codice sono cifrati (AES-GCM, chiave PBKDF2 dal nome del posto).
+// Si sblocca solo scrivendo la risposta giusta nella ricerca. Crea l'uovo: easter_egg/crea_uovo.py (project files).
+const EGG={"n": 1, "iter": 150000, "salt": "12424213818ca068a43ed98d835370da", "iv": "51cfa5f1bd22d77e62516454", "ct": "494e1e2c27c50bd0419b89a05c49d325e066608e815cef0c04ca583c884f93221d8b00a84dec65247736b7c09e5f9cdf15636e36eacfb4f9ecfc6195dfe759a284a6dd8c406c4c16884d21ec3227eaebde032f27129796e735e68b0602fe07c4f8"};
+const EGG_WINNERS=[];   // [{n:1,user:"@x",city:"..."}]: badge Egg Hunter
+const EGG_W=new Set(EGG_WINNERS.map(w=>w.user.toLowerCase()));
+const eggBadge=u=>EGG_W.has(String(u).toLowerCase())?' <span class="egg-b" title="Egg Hunter">🥚</span>':'';
+const eggTried=new Map(); let eggTown=null, eggData=null;
+const hexB=h=>new Uint8Array(h.match(/../g).map(x=>parseInt(x,16)));
+const eggNorm=s=>s.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();
+async function eggOpen(cand){
+  if(!EGG||!cand||cand.length<3||!(window.crypto&&crypto.subtle)) return null;
+  if(eggTried.has(cand)) return eggTried.get(cand);
+  const p=(async()=>{
+    try{
+      const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(cand),'PBKDF2',false,['deriveKey']);
+      const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:hexB(EGG.salt),iterations:EGG.iter,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['decrypt']);
+      const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:hexB(EGG.iv)},key,hexB(EGG.ct));
+      return JSON.parse(new TextDecoder().decode(pt));
+    }catch(e){ return null; }
+  })();
+  eggTried.set(cand,p); return p;
+}
+async function eggTry(raw, deep){
+  if(eggData) return !!eggTown;
+  const n=eggNorm(raw||''); if(!n) return false;
+  const c=[n]; if(deep) n.split(' ').forEach(w=>{ if(w.length>=5&&!c.includes(w)) c.push(w); });
+  for(const x of c){ const d=await eggOpen(x); if(d){ eggFound(d); return true; } }
+  return false;
+}
+function eggFound(d){
+  eggData=d; closeResults(); qEl.blur();
+  if(preview){ towns.splice(towns.indexOf(preview),1); preview=null; }
+  eggTown=T('Golden Egg','',d.lat,d.lon,1,'',null,0);
+  eggTown.ghost=true; eggTown.preview=true; eggTown.egg=true;
+  towns.push(eggTown); buildWorld(); select(eggTown.id,true);
+  try{ localStorage.setItem('ocw-egg'+EGG.n,'1'); }catch(e){}
+}
+function renderEgg(){
+  const d=eggData;
+  pane.innerHTML=`
+    <div class="egg-hero">
+      <div class="egg-ico" aria-hidden="true">🥚</div>
+      <div class="eyebrow">Golden Egg #${EGG.n} · ${esc(d.name)}</div>
+      <h2 class="town-name">You found it!</h2>
+      <p class="meta">Your secret code:</p>
+      <div class="egg-code" id="egg-code">${esc(d.code)}</div>
+    </div>
+    <ol class="steps">
+      <li><div><b>Screenshot this</b> and copy the code.</div></li>
+      <li><div><b>Send the code in DM</b> to @onecommentworld, with your Instagram name.</div></li>
+      <li><div>The <b>first follower</b> who sends it wins <b>$5</b> + the <b>Egg Hunter 🥚</b> badge on their house, forever.</div></li>
+    </ol>
+    <button class="btn" id="egg-copy">Copy the code</button>
+    <a class="btn ghost" href="https://ig.me/m/onecommentworld" target="_blank" rel="noopener">Open the DM</a>
+    <p class="hint">You must follow @onecommentworld and have a house on the map. Shhh: don't post the answer in the comments 🤫</p>`;
+  pane.querySelector('#egg-copy').onclick=()=>{
+    const fail=()=>toast('Copy didn\'t work here. Screenshot the code.');
+    try{ navigator.clipboard.writeText(d.code).then(()=>toast('Code copied. Send it in DM to @onecommentworld.'),fail); }catch(e){ fail(); }
+  };
+}
+function eggRules(){
+  if(!EGG) return '';
+  const w=EGG_WINNERS.filter(x=>x.n===EGG.n);
+  return `<div class="sec egg-sec"><h3>🥚 Golden Egg hunt #${EGG.n}</h3>
+    <p class="hint">A golden egg is hidden somewhere on this map. There are 3 clues: <b>#1</b> is in the Day 11 reel, <b>#2</b> in its caption, and <b>#3</b> is right here:</p>
+    <p class="egg-clue">“Its name comes from an American businessman.”</p>
+    <p class="hint">Put the 3 clues together and type the town in the search bar. Find the egg, get the secret code, send it in DM to @onecommentworld. First follower wins <b>$5</b> + the <b>Egg Hunter 🥚</b> badge on their house. More eggs are coming.</p>
+    <h3 style="margin-top:12px">Egg Hunters</h3>
+    ${w.length?`<div class="chips">${w.map(x=>`<span class="chip f">🥚 ${esc(x.user)} · ${esc(x.city)}</span>`).join('')}</div>`:'<p class="hint">Nobody yet. Be the first.</p>'}
+  </div>`;
+}
+let eggDeb=null;
+qEl.addEventListener('input',()=>{ clearTimeout(eggDeb); const v=qEl.value; eggDeb=setTimeout(()=>eggTry(v,false),700); });
+qEl.addEventListener('keydown',e=>{ if(e.key==='Enter') eggTry(qEl.value,true); },true);
+
+pickCity=(orig=>function(i){ const g=geoIndex(), nm=g&&g.name[i]; orig(i); if(nm) eggTry(nm,false); })(pickCity);
+
 function pickCity(i){
   const g=geoIndex(); qEl.value=g.name[i]; qClear.hidden=false; closeResults(); qEl.blur();
   if(preview){ towns.splice(towns.indexOf(preview),1); preview=null; }
