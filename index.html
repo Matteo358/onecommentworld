@@ -1975,19 +1975,22 @@ function zoomAt(f, cx, cy){
 let downLbl = null;
 const onMapLayer = el => el === mapEl || mapEl.contains(el) || labelsEl.contains(el);
 mapEl.parentElement.addEventListener('pointerdown', e => { if (!onMapLayer(e.target)) return;
+  if (e.isPrimary) { ptrs.clear(); pinch0 = null; }   // primo dito di un gesto nuovo: niente dita rimaste dal gesto prima
   if (!ptrs.size) downLbl = labelsEl.contains(e.target) ? e.target.closest('button') : null;
   mapEl.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, {x: e.clientX, y: e.clientY}); moved = 0; flyA = null; vel = {x: 0, y: 0, t: 0}; zoomT = null;
-  if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch0 = {d: Math.hypot(a.x - b.x, a.y - b.y), h: api.view.h}; } });
+  if (ptrs.size >= 2) startPinch(); });
+function startPinch(){ if (!api) return; const [a, b] = [...ptrs.values()]; pinch0 = {d: Math.max(20, Math.hypot(a.x - b.x, a.y - b.y)), h: api.view.h}; }
 mapEl.addEventListener('pointermove', e => {
   const p = ptrs.get(e.pointerId); if (!p || !api) return;
   const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY; moved += Math.abs(dx) + Math.abs(dy);
   if (ptrs.size === 1) { const k = kmPerPx(), now = performance.now(), dt = Math.max(8, now - (vel.t || now - 16));
     api.view.x -= dx * k; api.view.y += dy * k; dirty = true;
     vel = {x: vel.x * 0.6 + 0.4 * (-dx * k / dt), y: vel.y * 0.6 + 0.4 * (dy * k / dt), t: now}; }
-  else if (ptrs.size === 2 && pinch0) { const [a, b] = [...ptrs.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y);
+  else if (ptrs.size >= 2 && pinch0) { const [a, b] = [...ptrs.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y);
     const r = mapEl.getBoundingClientRect(); zoomAt(pinch0.h * pinch0.d / Math.max(20, d) / api.view.h, (a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top); }
 });
 const up = e => {
+  if (!ptrs.has(e.pointerId)) return;   // dito già tolto (pointerup e lostpointercapture arrivano entrambi)
   if (ptrs.size === 1 && moved < 6 && api) {   // tocco: città più vicina entro 44 px
     const r = mapEl.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top; let best = null, bd = 44;
     towns.forEach(t => { const p = townXY(t), [sx, sy] = api.project(p.x, p.y, 0), d = Math.hypot(sx - x, sy - y); if (d < bd) { bd = d; best = t; } });
@@ -1996,13 +1999,21 @@ const up = e => {
     if (best) select(best.id, true); else if (isPhone()) setSheet(false);   // tocco sulla mappa vuota: chiude il menu
   }
   if (ptrs.size === 1 && performance.now() - vel.t > 60) vel = {x: 0, y: 0, t: 0};   // fermo prima di lasciare: niente inerzia
-  ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch0 = null;
+  ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch0 = null; else startPinch();   // tolto il terzo dito: si riparte dai due rimasti
+  if (ptrs.size === 1) vel = {x: 0, y: 0, t: 0};   // dopo il pinch un dito solo non lancia la mappa
   if (!ptrs.size) downLbl = null;
 };
 // iPhone/Instagram: niente zoom di tutta la pagina col pinch (si ingrandisce solo la mappa)
 ['gesturestart','gesturechange'].forEach(t => document.addEventListener(t, e => e.preventDefault(), {passive: false}));
 document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault(); }, {passive: false});
-mapEl.addEventListener('pointerup', up); mapEl.addEventListener('pointercancel', up);
+window.addEventListener('pointerup', up, true); window.addEventListener('pointercancel', up, true);   // anche se il dito si alza fuori dalla mappa
+mapEl.addEventListener('lostpointercapture', up);
+const clearPtrs = () => { ptrs.clear(); pinch0 = null; downLbl = null; };
+window.addEventListener('blur', clearPtrs); document.addEventListener('visibilitychange', clearPtrs);
+// se il telefono è riuscito lo stesso a ingrandire la pagina, la si rimette a posto
+if (window.visualViewport) { const vm = document.querySelector('meta[name=viewport]'); let vT = 0;
+  visualViewport.addEventListener('resize', () => { if (!vm || visualViewport.scale < 1.02) return; clearTimeout(vT); vT = setTimeout(() => {
+    const c = vm.content; vm.content = c.replace(/,?maximum-scale=[^,]*/, '') + ',maximum-scale=1.0001'; setTimeout(() => { vm.content = c; resize(); }, 60); }, 250); }); }
 mapEl.addEventListener('wheel', e => { e.preventDefault(); if (!api) return; flyA = null; const r = mapEl.getBoundingClientRect();
   const f = Math.exp(Math.max(-1, Math.min(1, e.deltaY * (e.ctrlKey ? 0.01 : 0.0022))));
   zoomT = {h: Math.max(0.05, Math.min(32000, (zoomT ? zoomT.h : api.view.h) * f)), cx: e.clientX - r.left, cy: e.clientY - r.top}; }, {passive: false});
@@ -2018,8 +2029,8 @@ function tick(){
     api.view.x += vel.x * 16; api.view.y += vel.y * 16; vel.x *= 0.92; vel.y *= 0.92; dirty = true; }
   if (zoomT) { const r = zoomT.h / api.view.h; if (Math.abs(Math.log(r)) < 0.004) { zoomAt(r, zoomT.cx, zoomT.cy); zoomT = null; } else zoomAt(Math.pow(r, 0.22), zoomT.cx, zoomT.cy); }
   // villaggi costruiti solo quando servono (avvio più veloce)
-  if (api.view.h < 20) for (const t of towns) if (t.v && !t.built && t.v.trees) { const dx = t.v.cx - api.view.x, dy = t.v.cy - api.view.y;
-    if (Math.abs(dx) < api.view.h * 2 + 3 && Math.abs(dy) < api.view.h * 2 + 3) { api.setPop(t.V, t.ghost ? 0 : t.v.n, 1e9); t.built = true; dirty = true; } }
+  if (api.view.h < 20) for (const t of towns) if (t.v && !t.built) { const dx = t.v.cx - api.view.x, dy = t.v.cy - api.view.y;
+    if (Math.abs(dx) < api.view.h * 2 + 3 && Math.abs(dy) < api.view.h * 2 + 3) { api.setPop(t.V, t.ghost ? 0 : t.v.n, 1e9); t.built = true; t.bare = !t.v.trees; dirty = true; } }
   const v = api.view; v.y = Math.max(-8000, Math.min(17000, v.y));
   if (v.x > 20037) v.x -= 40075; if (v.x < -20037) v.x += 40075;
   if (dirty) { api.render(); placeLabels(); dirty = false; }
@@ -2027,7 +2038,8 @@ function tick(){
 // sito pubblicato (sito/web): mappa grossa subito, poi in sottofondo coste fini, alberi/campi dei villaggi e ricerca città.
 // index_v3.html (reel, file://): tutto dentro la pagina come prima.
 const WEB = typeof GEO3 === 'undefined';
-const getGz = u => fetch(u).then(r => { if (!r.ok) throw new Error(u + ' ' + r.status); return r.arrayBuffer(); }).then(OCW.gunzip);
+const getGz = (u, n = 4) => fetch(u).then(r => { if (!r.ok) throw new Error(u + ' ' + r.status); return r.arrayBuffer(); }).then(OCW.gunzip)
+  .catch(e => { if (n <= 1) throw e; return new Promise(ok => setTimeout(ok, (5 - n) * 1500)).then(() => getGz(u, n - 1)); });   // riprova 3 volte
 function villDetail(dv){   // vill.bin: per villaggio alberi [x,y,scala,tipo] e campi [x0,y0,x1,y1,colore], coordinate in decimetri
   let o = 4; const n = dv.getUint32(0, true);
   for (let i = 0; i < n; i++) {
@@ -2037,6 +2049,7 @@ function villDetail(dv){   // vill.bin: per villaggio alberi [x,y,scala,tipo] e 
     for (let k = 0; k < nf; k++, o += 9) fl[k] = [dv.getInt16(o, true) / 10, dv.getInt16(o + 2, true) / 10, dv.getInt16(o + 4, true) / 10, dv.getInt16(o + 6, true) / 10, dv.getUint8(o + 8)];
     VILL3[i].fields = fl; VILL3[i].trees = tr;
   }
+  towns.forEach(t => { if (t.built && t.bare) { t.built = false; t.bare = false; t.V.shown = -1; } });   // villaggi già costruiti senza alberi: si rifanno
   dirty = true;
 }
 async function startMap(){
