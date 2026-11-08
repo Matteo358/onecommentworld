@@ -2958,8 +2958,8 @@ let preview=null;
 // ---------- easter egg (Golden Egg hunt) ----------
 // La risposta non è nel sito: il posto e il codice sono cifrati (AES-GCM, chiave PBKDF2 dal nome del posto).
 // Si sblocca solo scrivendo la risposta giusta nella ricerca. Crea l'uovo: easter_egg/crea_uovo.py (project files).
-const EGG={"n": 1, "iter": 150000, "salt": "b048b7b67904ea243ca29e6dfc23d37d", "iv": "8c9dda0de3905b2d4d204097", "ct": "c71d518ffff4fb0ee1decf4f064c53e89242ae60b63003eaa808bb3efb8388f2ab909e83c82a993be45aefeec8cf737d62f4f950b157dffd27e03718a8516b8fac63f8032316267e52c52bd52ca8c0a710a471cfe88ed4b38be48d939d44922b815f7f5b0e64eb78a128d8c269f58cf2c39dce8393d006e579c6242fb70cd45204efda115396584fd8ab7fcf3d810a7c41f519d07da5b20711abee0002b10eca57f64ccf1af6f9932e9ee00b3eeb94776d83cabb498b3329032254d56e35d5b0c5958c9d7a5a63865055fa9d94e98f1761fb009ba1cff06935a891fb6bacd5a5b0d8ec24792675e035f344c7993dd7cae17b0bba07281636ac300c172c568cb55fde8e0b545333133e45551afb709a6f9aef01a3cc4520a1c061424aefd511051f7b084819029c748cdd8d0694c32dacd26747e2fee9f3f6e787a8742f4533a830"};
-const EGG_WINNERS=[];   // [{n:1,user:"@x",city:"..."}]: badge Egg Hunter
+const EGG=null;
+const EGG_WINNERS=[{"n":1,"user":"@danyxcz_48","city":"Bělá pod Bezdězem"}];   // [{n:1,user:"@x",city:"..."}]: badge Egg Hunter
 const EGG_W=new Set(EGG_WINNERS.map(w=>w.user.toLowerCase()));
 const eggBadge=u=>EGG_W.has(String(u).toLowerCase())?' <span class="egg-b" title="Egg Hunter">🥚</span>':'';
 const eggTried=new Map(); let eggTown=null, eggData=null;
@@ -3038,7 +3038,9 @@ function renderEgg(){
   };
 }
 function eggRules(){
-  if(!EGG) return '';
+  if(!EGG) return EGG_WINNERS.length?`<div class="sec egg-sec"><h3>🥚 Egg Hunters</h3>
+    <p class="hint">The first to find each golden egg gets the Egg Hunter badge on their house, forever. More eggs are coming.</p>
+    <div class="chips">${EGG_WINNERS.map(x=>`<span class="chip f">🥚 #${x.n} ${esc(x.user)} · ${esc(x.city)}</span>`).join('')}</div></div>`:'';
   const w=EGG_WINNERS.filter(x=>x.n===EGG.n);
   return `<div class="sec egg-sec"><h3>🥚 Golden Egg hunt #${EGG.n}</h3>
     <p class="hint">A golden egg is hidden somewhere on this map. There are 3 clues: <b>#1</b> is in the Day 11 reel, <b>#2</b> in its caption, and <b>#3</b> is right here:</p>
