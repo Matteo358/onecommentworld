@@ -3529,7 +3529,7 @@ function renderBadges(){
 render = (orig => function(){ if (tab === 'badges') return renderBadges(); orig(); })(render);
 window.OCW_SITE_X = {towns: () => towns, follow: (u) => followUser(u), where: () => api && api.alive && api.alive.where()};
 
-const MAYORS={"mayors":[],"elections":[{"id":"E1","title":"First Mayor election","cities":"auto","open":"2026-11-10T18:00:00Z","close":"2026-11-12T18:00:00Z","url":null,"status":"open"}]};
+const MAYORS={"mayors":[],"elections":[{"id":"E1","title":"First Mayor election","cities":"auto","open":"2026-11-10T18:00:00Z","close":"2026-11-12T18:00:00Z","url":"https://www.instagram.com/reel/DfkgAIagPa2/","status":"open","post_ids":["18139096954725065"]}]};
 function pickCity(i){
   const g=geoIndex(); qEl.value=g.name[i]; qClear.hidden=false; closeResults(); qEl.blur();
   if(preview){ towns.splice(towns.indexOf(preview),1); preview=null; }
