@@ -3391,7 +3391,7 @@ qEl.addEventListener('keydown',e=>{ if(e.key==='Enter') eggTry(qEl.value,true); 
 
 pickCity=(orig=>function(i){ const g=geoIndex(), nm=g&&g.name[i]; orig(i); if(nm) eggTry(nm,false); })(pickCity);
 
-const MAYORS={"mayors":[],"elections":[]};
+const MAYORS={"mayors":[],"elections":[{"id":"E1","title":"First Mayor election","cities":"auto","open":"2026-11-10T18:00:00Z","close":"2026-11-12T18:00:00Z","url":null,"status":"open"}]};
 function pickCity(i){
   const g=geoIndex(); qEl.value=g.name[i]; qClear.hidden=false; closeResults(); qEl.blur();
   if(preview){ towns.splice(towns.indexOf(preview),1); preview=null; }
