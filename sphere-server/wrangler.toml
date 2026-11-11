@@ -12,4 +12,4 @@ new_sqlite_classes = ["Sphere"]
 
 [vars]
 REQUIRE_FOLLOW = "1"
-REQUIRE_HOUSE = "1"
+FOLLOW_UNKNOWN = "deny"

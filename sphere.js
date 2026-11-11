@@ -8,6 +8,9 @@
   function toast(t) { const el = document.getElementById('toast'); if (!el) return; el.textContent = t; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 3200); }
   const SERVER = (QS.get('sphere') || 'https://ocw-sphere.matteopirone1123.workers.dev').replace(/\/$/, '');
   const ADMIN = QS.get('admin');
+  // where people comment their code: the Sphere reel (set it here when it's out; until then the profile)
+  const REEL = QS.get('reel') || 'https://www.instagram.com/onecommentworld/';
+  let pendUser = null;
   const DEMO = SERVER === 'demo';      // ?sphere=demo : no server, fake people drawing (to try it out)
   const W = 4096, H = 2048, TW = 4096, TH = 2048, SC = TW / W;   // drawing texture at full resolution (1 unit = 1 px)
   const NOD = Math.round(H * 125 / 180);   // below 35°S (the bottom of the sphere) nobody can draw: you couldn't see it from the map
@@ -96,7 +99,8 @@
     ws.onmessage = e => {
       let m; try { m = JSON.parse(e.data); } catch (x) { return; }
       if (m.t === 'b') { online = m.n; drawingNow = m.d; for (const [id, c, w, p] of m.dr) addPts(id, c, w, p); ui(); }
-      else if (m.t === 'code') { myCode = m.code; ui(); }
+      else if (m.t === 'code') { myCode = m.code; pendUser = null; ui(); }
+      else if (m.t === 'pend') { pendUser = m.user; ui(); }
       else if (m.t === 'me') { me = m; meAt = Date.now(); if (me.state !== 'active' && me.state !== 'new') pen.mode = 'move'; ui(); }
       else if (m.t === 'del') { for (const id of m.ids) strokes.delete(id); redraw(); }
       else if (m.t === 'wipe') { strokes.clear(); redraw(); }
@@ -292,10 +296,10 @@
     else if (st === 'ipfull') t = 'Too many drawings from this connection today. Try tomorrow!';
     else if (st === 'nohouse') t = `<b>${esc(me.user || '')}</b>, the Sphere is for people with a house on the map. Comment your city under our latest reel to get yours (new houses every 12 h), then send a new code.<div class="sph-code"><button type="button" data-a="code">Get a new code</button></div>`;
     else if (st === 'verify' || st === 'notfollower') {
-      const head = st === 'verify' ? '<b>Only for people with a house.</b> Send this code in DM to @onecommentworld from the account that has a house:'
+      const head = st === 'verify' ? '<b>Followers only.</b> Comment this code under the Sphere reel, then tap the button in the DM we send you:'
         : `<b>${esc(me.user || '')}</b>, you don't follow @onecommentworld yet. Follow, then send a new code:`;
-      t = `${head}<div class="sph-code">${myCode && st === 'verify' ? `<b class="sph-c-txt">${esc(myCode)}</b><button type="button" data-a="copy">Copy</button><a href="https://ig.me/m/onecommentworld" target="_blank" rel="noopener" data-a="dm">Open DM</a>`
-        : '<button type="button" data-a="code">Get my code</button>'}</div>` + (myCode && st === 'verify' ? '<small>It unlocks here by itself a few seconds after you send it.</small>' : '');
+      t = `${head}<div class="sph-code">${myCode && st === 'verify' ? `<b class="sph-c-txt">${esc(myCode)}</b><button type="button" data-a="copy">Copy</button><a href="${REEL}" target="_blank" rel="noopener" data-a="dm">Open the reel</a>`
+        : '<button type="button" data-a="code">Get my code</button>'}</div>` + (myCode && st === 'verify' ? (pendUser ? `<small>Got your comment, <b>${esc(pendUser)}</b>! Open your DMs from @onecommentworld and tap the button. Not following yet? Follow first. It unlocks here by itself.</small>` : '<small>It unlocks here by itself once you follow and tap the button in our DM.</small>') : '');
     }
     if (st !== 'verify' && st !== 'notfollower' && st !== 'nohouse' && me && me.user) t += ` <small class="sph-who">Drawing as <b>${esc(me.user)}</b></small>`;
     if (msg.dataset.t !== t) { msg.innerHTML = t; msg.dataset.t = t; }

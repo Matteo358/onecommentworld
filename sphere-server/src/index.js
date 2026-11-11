@@ -7,7 +7,10 @@
 //       POST /admin/erase?key=..&x0..y1&ban=1  -> delete strokes touching a rectangle (+ ban their authors 7 days)
 //       POST /admin/wipe?key=..         -> delete everything
 //       GET  /admin/hooks?key=..        -> last webhook bodies received from PostZen (to check their format)
-//       POST /hook/postzen?t=HOOK_TOKEN -> PostZen webhook (message.received): a DM with a "DRAW 1234" code unlocks drawing
+//       POST /hook/postzen?t=HOOK_TOKEN -> PostZen webhooks. FOLLOW_VIA=comment (default): comment.received with "DRAW 1234X"
+//            under the Sphere reel links the code to an Instagram id; PostZen's comment automation (followers only, follow gate)
+//            then sends the final DM, and message.sent (source automation, text with UNLOCK_MARK) unlocks that id = a real follower.
+//            FOLLOW_VIA=dm: the old way, a DM with the code (PostZen doesn't say if the sender follows).
 // WS  C->S {t:"hello",dev}  {t:"code"}  {t:"p",k,c,w,p:[x,y,...]}  {t:"e",k}
 //     S->C {t:"me",...}  {t:"code",code}  {t:"b",n,d,dr:[[id,c,w,[pts]]...]}  {t:"del",ids}  {t:"wipe"}  {t:"no",why}
 //
@@ -46,6 +49,7 @@ export class Sphere {
       CREATE TABLE IF NOT EXISTS codes(code TEXT PRIMARY KEY, dev TEXT, t INTEGER);
       CREATE TABLE IF NOT EXISTS hooks(id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER, body TEXT);`);
     try { this.sql.exec('ALTER TABLE verified ADD COLUMN house INTEGER'); } catch (e) { }
+    this.sql.exec('CREATE TABLE IF NOT EXISTS pend(igid TEXT PRIMARY KEY, user TEXT, dev TEXT, t INTEGER)');
     this.houses = null; this.housesAt = 0;
     this.strokes = null;          // id -> {id,dev,t,c,w,pts:number[],dirty}
     this.out = []; this.outDel = []; this.timer = null; this.ink = new Map();   // dev -> {v, dirty}
@@ -100,6 +104,9 @@ export class Sphere {
       this.sql.exec('INSERT INTO hooks(t,body) VALUES(?,?)', Date.now(), body.slice(0, 8000));
       this.sql.exec('DELETE FROM hooks WHERE id <= (SELECT MAX(id) - 30 FROM hooks)');
       let j; try { j = JSON.parse(body); } catch { return json({ ok: true, matched: false }); }
+      if (j.type === 'comment.received' || j.comment) return json({ ok: true, ...(await this.onComment(j)) });
+      if (j.type === 'message.sent') return json({ ok: true, ...(await this.onSent(j)) });
+      if (this.env.FOLLOW_VIA !== 'dm') return json({ ok: true, matched: false, ignored: 'dm' });
       return json({ ok: true, ...(await this.onDM(j)) });
     }
     if (url.pathname === '/admin/hooks') {
@@ -143,6 +150,33 @@ export class Sphere {
     } catch (e) { }
     return this.houses;
   }
+  // a comment "DRAW 1234X": remember which Instagram id asked for which device (unlocked later by the automation's final DM)
+  async onComment(j) {
+    const c0 = (j.data && j.data.comment) || j.comment || {}, au = c0.author || {};
+    const mt = /DRAW\s*([0-9]{4}[A-Z])/i.exec(c0.text || ''); if (!mt || !au.id) return { matched: false };
+    const c = [...this.sql.exec('SELECT dev FROM codes WHERE code=?', mt[1].toUpperCase())][0]; if (!c) return { matched: false, code: false };
+    const user = String(au.username || '').replace(/^@/, '').toLowerCase().replace(/[^a-z0-9._]/g, '').slice(0, 40);
+    this.sql.exec('DELETE FROM pend WHERE t < ?', Date.now() - 7 * 24 * 3600e3);
+    this.sql.exec('INSERT OR REPLACE INTO pend(igid,user,dev,t) VALUES(?,?,?,?)', String(au.id), user, c.dev, Date.now());
+    this.sql.exec('DELETE FROM codes WHERE code=?', mt[1].toUpperCase());
+    this.push(c.dev, { t: 'pend', user: '@' + user });
+    return { matched: true, pending: '@' + user };
+  }
+  // the comment automation's final DM went out = Instagram confirmed they follow
+  async onSent(j) {
+    const m = (j.data && j.data.message) || j.message || {};
+    const mark = this.env.UNLOCK_MARK || 'Sphere unlocked';
+    if (m.source !== 'automation' || !m.recipientId || !String(m.text || '').includes(mark)) return { matched: false };
+    if (this.env.SPHERE_AUTOMATION && m.automationId !== this.env.SPHERE_AUTOMATION) return { matched: false };
+    const p = [...this.sql.exec('SELECT user,dev FROM pend WHERE igid=?', String(m.recipientId))][0]; if (!p) return { matched: false, pend: false };
+    const hs = await this.houseSet(), house = hs ? (hs.has(p.user) ? 1 : 0) : null;
+    this.sql.exec('INSERT OR REPLACE INTO verified(dev,user,follower,t,house) VALUES(?,?,?,?,?)', p.dev, '@' + p.user, 1, Date.now(), house);
+    this.sql.exec('DELETE FROM pend WHERE igid=?', String(m.recipientId));
+    this.refresh(p.dev);
+    return { matched: true, user: '@' + p.user, follower: 1, house };
+  }
+  push(dev, o) { for (const ws of this.state.getWebSockets()) { const a = ws.deserializeAttachment(); if (a && a.dev === dev) ws.send(JSON.stringify(o)); } }
+  refresh(dev) { for (const ws of this.state.getWebSockets()) { const a = ws.deserializeAttachment(); if (a && a.dev === dev) { this.me(ws, a); ws.serializeAttachment(a); } } }
   async onDM(j) {
     const texts = [], users = [], follows = [];
     const walk = (o, k, d) => {
