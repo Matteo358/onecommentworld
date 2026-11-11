@@ -4,6 +4,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="description" content="The first fully organic global community. One comment = one house on the map. 2390 cities and counting.">
 <link rel="icon" href="logo.png">
+<link rel="stylesheet" href="sphere.css">
 <link rel="preload" href="engine.js?v=0126b6ac4e" as="script">
 <link rel="preload" href="geo-coarse.bin?v=e49bd2043a" as="fetch" crossorigin>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3624,4 +3625,5 @@ setTimeout(()=>(window.requestIdleCallback||setTimeout)(()=>geoIndex()),5000);
 startMap().then(()=>{ const W=mapEl.clientWidth>760; api.lookAt(44,14,W?4200:9000); const v=api.view; const p=panelOffset({x:v.x,y:v.y},v.h); api.set(p.x,p.y,p.h); dirty=true; });
 requestAnimationFrame(tick);
 })();
-</script>
+</script><script src="sphere.js" defer></script>
+
