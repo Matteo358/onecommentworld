@@ -39,3 +39,10 @@ body.sph-open{overflow:hidden}
 .sph-pal button{aspect-ratio:1;max-height:34px;border-radius:50%;border:2px solid rgba(255,255,255,.18);background:var(--c);cursor:pointer;padding:0}
 .sph-pal button.on{outline:3px solid #fff;outline-offset:2px}
 @media (min-width:760px){.sph-pal{grid-template-columns:repeat(16,1fr)}}
+.sph-code{display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:8px}
+.sph-c-txt{font:400 20px/1 var(--display);letter-spacing:1.5px;color:#ffcf3f;padding:8px 12px;border:2px dashed #ffcf3f;border-radius:10px}
+.sph-code button,.sph-code a{height:38px;padding:0 14px;border-radius:999px;border:2px solid #2b4a57;background:#13262f;color:inherit;font:700 14px/34px var(--body);text-decoration:none;cursor:pointer}
+.sph-code a{background:#38c6ff;border-color:#38c6ff;color:#06202b}
+.sph-code [data-a="code"]{background:#ffcf3f;border-color:#ffcf3f;color:#2a2100}
+.sph-msg small{display:block;opacity:.75;margin-top:6px;font-size:12.5px}
+.sph-msg small.sph-who{display:inline;margin:0}

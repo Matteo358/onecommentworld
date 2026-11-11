@@ -4,6 +4,8 @@
 // Server: sphere-server/ (Cloudflare Worker + Durable Object). Test: ?sphere=http://localhost:8787   Moderation: ?admin=KEY
 (function () {
   const QS = new URLSearchParams(location.search);
+  let toastT = null;
+  function toast(t) { const el = document.getElementById('toast'); if (!el) return; el.textContent = t; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 3200); }
   const SERVER = (QS.get('sphere') || 'https://ocw-sphere.onecommentworld.workers.dev').replace(/\/$/, '');
   const ADMIN = QS.get('admin');
   const DEMO = SERVER === 'demo';      // ?sphere=demo : no server, fake people drawing (to try it out)
@@ -19,8 +21,9 @@
   // ---- state: strokes ----
   const strokes = new Map();           // id -> {c,w,pts:[], t0 (local ms of birth)}
   const tex = document.createElement('canvas'); tex.width = TW; tex.height = TH;
-  const g = tex.getContext('2d');
-  let texDirty = true, textures = [], mapDirty = true;
+  const g = tex.getContext('2d', { willReadFrequently: true });   // we read back small rectangles to upload them
+  let texDirty = true, textures = [], mapDirty = true, fullDirty = true, dirtyR = null;   // dirtyR: [x0,y0,x1,y1] in texture px, uploaded alone (fast)
+  function markR(x0, y0, x1, y1) { if (!dirtyR) dirtyR = [x0, y0, x1, y1]; else { dirtyR[0] = Math.min(dirtyR[0], x0); dirtyR[1] = Math.min(dirtyR[1], y0); dirtyR[2] = Math.max(dirtyR[2], x1); dirtyR[3] = Math.max(dirtyR[3], y1); } }
   const small = document.createElement('canvas'); small.width = 2048; small.height = 1024;   // the sphere on the map is small: half resolution is plenty
   const sg = small.getContext('2d');
   function paintBg() {
@@ -47,7 +50,8 @@
     const p = s.pts; if (p.length < 2) return;
     g.globalAlpha = alpha; g.strokeStyle = COLORS[s.c] || '#fff'; g.fillStyle = g.strokeStyle;
     g.lineWidth = WIDTHS[s.w] * SC; g.lineCap = 'round'; g.lineJoin = 'round';
-    const i0 = Math.max(0, from - 2);
+    const i0 = Math.max(0, from - 2), m = WIDTHS[s.w] * SC + 2;
+    { let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (let i = i0; i < p.length; i += 2) { const x = p[i] * SC, y = p[i + 1] * SC; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } markR(x0 - m, y0 - m, x1 + m, y1 + m); }
     if (p.length - i0 <= 2) { g.beginPath(); g.arc(p[i0] * SC, p[i0 + 1] * SC, Math.max(.6, WIDTHS[s.w] * SC / 2), 0, 7); g.fill(); return; }
     g.beginPath(); g.moveTo(p[i0] * SC, p[i0 + 1] * SC);
     for (let i = i0 + 2; i < p.length; i += 2) g.lineTo(p[i] * SC, p[i + 1] * SC);
@@ -56,7 +60,7 @@
   function redraw() {
     const now = Date.now(); paintBg();
     for (const [id, s] of strokes) { const a = alphaOf(s, now); if (a <= 0) { strokes.delete(id); continue; } seg(s, 0, a); }
-    texDirty = mapDirty = true;
+    texDirty = mapDirty = fullDirty = true;
   }
   function addPts(id, c, w, pts, t0) {
     let s = strokes.get(id);
@@ -68,7 +72,7 @@
   try { document.fonts.ready.then(redraw); } catch (e) { }
 
   // ---- network ----
-  let ws = null, wsWant = false, online = 0, drawingNow = 0, me = null, meAt = 0, stateLoaded = false, retry = 1000;
+  let myCode = null, ws = null, wsWant = false, online = 0, drawingNow = 0, me = null, meAt = 0, stateLoaded = false, retry = 1000;
   const dev = (() => { try { let d = localStorage.getItem('ocw-dev'); if (!d) { d = [...crypto.getRandomValues(new Uint8Array(12))].map(b => b.toString(16).padStart(2, '0')).join(''); localStorage.setItem('ocw-dev', d); } return d; } catch (e) { return 'x' + Math.random().toString(16).slice(2); } })();
   async function loadState() {
     if (DEMO) { demoSeed(); stateLoaded = true; redraw(); ui(); return; }
@@ -92,6 +96,7 @@
     ws.onmessage = e => {
       let m; try { m = JSON.parse(e.data); } catch (x) { return; }
       if (m.t === 'b') { online = m.n; drawingNow = m.d; for (const [id, c, w, p] of m.dr) addPts(id, c, w, p); ui(); }
+      else if (m.t === 'code') { myCode = m.code; ui(); }
       else if (m.t === 'me') { me = m; meAt = Date.now(); if (me.state !== 'active' && me.state !== 'new') pen.mode = 'move'; ui(); }
       else if (m.t === 'del') { for (const id of m.ids) strokes.delete(id); redraw(); }
       else if (m.t === 'wipe') { strokes.clear(); redraw(); }
@@ -159,8 +164,10 @@
     }
     send(raw) {
       const m = JSON.parse(raw);
-      if (m.t === 'hello') { this.me = { t: 'me', state: 'new', draw: 7 * 60e3, life: LIFE, ink: 12000, used: 0 }; this.emit(this.me); }
+      if (m.t === 'hello') { this.me = { t: 'me', state: 'verify', draw: 7 * 60e3, life: LIFE, ink: 12000, used: 0, user: null }; this.emit(this.me); }
+      if (m.t === 'code') this.emit({ t: 'code', code: 'DRAW ' + (1000 + Math.floor(Math.random() * 9000)) + String.fromCharCode(65 + Math.floor(Math.random() * 26)) });
     }
+    verify() { setTimeout(() => { this.me = { ...this.me, state: 'new', user: '@you' }; this.emit(this.me); toast('Unlocked! You follow @onecommentworld 🎉'); }, 3000); }   // demo: pretend the DM arrived
     close() { clearInterval(this.iv); this.readyState = 3; }
   }
   const send = o => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); };
@@ -188,6 +195,7 @@
     api.scene.add(grp);
     const r0 = api.render;
     api.render = function () {
+      if (open) return;                                                 // the drawing view covers the map: don't draw both
       const vw = api.view;
       grp.position.set(pos.x - vw.x, 0, -(pos.y - vw.y));
       grp.visible = vw.h < 60;
@@ -258,6 +266,7 @@
       <div class="sph-pal">${COLORS.map((c, i) => `<button type="button" data-c="${i}" style="--c:${c}" aria-label="Color ${i + 1}"></button>`).join('')}</div>
     </div>`;
   const $ = s => ov.querySelector(s);
+  const esc = x => String(x).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   function fmt(ms) { ms = Math.max(0, ms); const h = Math.floor(ms / 3600e3), m = Math.floor(ms % 3600e3 / 60e3), s = Math.floor(ms % 60e3 / 1000); return h ? `${h}h ${m}m` : `${m}:${String(s).padStart(2, '0')}`; }
   function ui() {
     if (!open) return;
@@ -270,7 +279,14 @@
     else if (st === 'done' || st === 'inkout') t = `Your drawing is on the Sphere ✨ Next one in <b>${fmt(me.next || (LIFE - (me.draw || 0)))}</b>.`;
     else if (st === 'banned') t = 'You can\'t draw on the Sphere right now.';
     else if (st === 'ipfull') t = 'Too many drawings from this connection today. Try tomorrow!';
-    msg.innerHTML = t;
+    else if (st === 'verify' || st === 'notfollower') {
+      const head = st === 'verify' ? '<b>Followers only.</b> Follow @onecommentworld, then send this code in DM to unlock your drawing:'
+        : `<b>${esc(me.user || '')}</b>, you don't follow @onecommentworld yet. Follow, then send a new code:`;
+      t = `${head}<div class="sph-code">${myCode && st === 'verify' ? `<b class="sph-c-txt">${esc(myCode)}</b><button type="button" data-a="copy">Copy</button><a href="https://ig.me/m/onecommentworld" target="_blank" rel="noopener" data-a="dm">Open DM</a>`
+        : '<button type="button" data-a="code">Get my code</button>'}</div>` + (myCode && st === 'verify' ? '<small>It unlocks here by itself a few seconds after you send it.</small>' : '');
+    }
+    if (st !== 'verify' && st !== 'notfollower' && me && me.user) t += ` <small class="sph-who">Drawing as <b>${esc(me.user)}</b></small>`;
+    if (msg.dataset.t !== t) { msg.innerHTML = t; msg.dataset.t = t; }
     meter.hidden = st !== 'active' && st !== 'new';
     if (!meter.hidden) {
       const left = st === 'active' ? me.left - (Date.now() - meAt) : me.draw;
@@ -289,6 +305,29 @@
   let localInk = 0;
   const inkUsed = () => Math.max(localInk, me ? me.used || 0 : 0);
 
+  // send only the changed rectangle to the GPU (a full 4096 x 2048 upload is what made drawing lag)
+  function upload(v, tx) {
+    const now = performance.now(), gl = v.renderer.getContext(), P = v.renderer.properties.get(tx);
+    if (fullDirty || !P.__webglTexture) {
+      if (now - (v.up || 0) < 400 && P.__webglTexture) return;      // full redraws are rare (fading, deletes): at most every 0.4 s
+      tx.needsUpdate = true; fullDirty = false; dirtyR = null; v.up = now; v.mip = false; return;
+    }
+    if (dirtyR) {
+      const x0 = Math.max(0, Math.floor(dirtyR[0])), y0 = Math.max(0, Math.floor(dirtyR[1])), x1 = Math.min(TW, Math.ceil(dirtyR[2])), y1 = Math.min(TH, Math.ceil(dirtyR[3]));
+      dirtyR = null;
+      if (x1 > x0 && y1 > y0) {
+        const img = g.getImageData(x0, y0, x1 - x0, y1 - y0);
+        v.renderer.state.activeTexture(gl.TEXTURE0); v.renderer.state.bindTexture(gl.TEXTURE_2D, P.__webglTexture);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false); gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+        gl.texSubImage2D(gl.TEXTURE_2D, 0, x0, TH - y1, gl.RGBA, gl.UNSIGNED_BYTE, img);
+        v.mip = true;
+      }
+    }
+    if (v.mip && now - (v.mipAt || 0) > 250) {                         // smaller copies for when you zoom out, refreshed 4 times a second
+      v.renderer.state.activeTexture(gl.TEXTURE0); v.renderer.state.bindTexture(gl.TEXTURE_2D, P.__webglTexture);
+      gl.generateMipmap(gl.TEXTURE_2D); v.mip = false; v.mipAt = now;
+    }
+  }
   function makeView() {
     const THREE = site.api.THREE, cv = $('.sph-c');
     const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true });
@@ -298,7 +337,7 @@
     const sph = new THREE.Mesh(new THREE.SphereGeometry(1, 128, 64), new THREE.MeshBasicMaterial({ map: tx }));
     const glow = new THREE.Mesh(new THREE.SphereGeometry(1.06, 48, 24), new THREE.MeshBasicMaterial({ color: 0x38c6ff, transparent: true, opacity: .08, side: THREE.BackSide }));
     scene.add(sph, glow);
-    const v = { renderer, scene, cam, sph, yaw: 0, pitch: 0.3, z: 1, ray: new THREE.Raycaster(), THREE };   // z: 1 = whole sphere, small = close up
+    const v = { renderer, scene, cam, sph, yaw: 0, pitch: 0.3, z: 1, ray: new THREE.Raycaster(), THREE, ball: new THREE.Sphere(new THREE.Vector3(), 1), tmp: new THREE.Vector3(), inv: new THREE.Matrix4() };   // z: 1 = whole sphere, small = close up
     v.size = () => { const r = cv.parentElement.getBoundingClientRect(); renderer.setSize(r.width, r.height, false); cam.aspect = r.width / r.height; cam.updateProjectionMatrix(); v.W = r.width; v.H = r.height; };
     v.frame = () => {
       if (!open) return;
@@ -306,15 +345,19 @@
       const half = Math.min(17.5, Math.atan(Math.tan(17.5 * Math.PI / 180) * v.W / v.H) * 180 / Math.PI) * Math.PI / 180;
       const fit = 1.1 / Math.sin(half);                      // distance that shows the whole sphere
       cam.position.set(0, 0, 1 + (fit - 1) * v.z); cam.near = 0.01; cam.updateProjectionMatrix(); cam.lookAt(0, 0, 0);
-      if (texDirty && performance.now() - (v.up || 0) > 80) { textures.forEach(t => t.needsUpdate = true); texDirty = false; v.up = performance.now(); }   // 4096 px: upload at most ~12 times a second
+      upload(v, tx);
       renderer.render(scene, cam); requestAnimationFrame(v.frame);
     };
     // screen point -> canvas units on the sphere
     v.pick = (cx, cy) => {
       const r = cv.getBoundingClientRect(), nd = new THREE.Vector2((cx - r.left) / r.width * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
-      v.ray.setFromCamera(nd, cam); const h = v.ray.intersectObject(sph)[0]; if (!h) return null;
-      const y = Math.round((1 - h.uv.y) * H); if (y >= NOD - 2) return null;
-      return { x: Math.max(0, Math.min(W - 1, Math.round(h.uv.x * W))), y: Math.max(0, y) };
+      // ray / unit sphere, no mesh raycast: cheap on every finger move
+      v.ray.setFromCamera(nd, cam); const hit = v.ray.ray.intersectSphere(v.ball, v.tmp); if (!hit) return null;
+      sph.updateMatrixWorld(); v.inv.copy(sph.matrixWorld).invert(); const q = hit.applyMatrix4(v.inv);
+      let phi = Math.atan2(q.z, -q.x); if (phi < 0) phi += Math.PI * 2;
+      const u = phi / (Math.PI * 2), y = Math.round(Math.acos(Math.max(-1, Math.min(1, q.y))) / Math.PI * H);
+      if (y >= NOD - 2) return null;
+      return { x: Math.max(0, Math.min(W - 1, Math.round(u * W))), y: Math.max(0, y) };
     };
     addEventListener('resize', () => open && v.size());
     return v;
@@ -378,6 +421,12 @@
     ov.querySelectorAll('.sph-modes button').forEach(b => b.onclick = () => { pen.mode = b.dataset.m; if (pen.mode === 'draw' && view.z > 0.5) view.z = 0.4; ui(); });
     ov.querySelectorAll('.sph-pal button').forEach(b => b.onclick = () => { pen.c = +b.dataset.c; if (pen.mode === 'move' && !$('[data-m="draw"]').disabled) { pen.mode = 'draw'; if (view.z > 0.5) view.z = 0.4; } ui(); });
     ov.querySelectorAll('.sph-w button').forEach(b => b.onclick = () => { pen.w = +b.dataset.w; ui(); });
+    $('#sph-msg').addEventListener('click', e => {
+      const a = e.target.closest('[data-a]'); if (!a) return;
+      if (a.dataset.a === 'code') { if (me && me.state === 'notfollower') me.state = 'verify'; myCode = null; send({ t: 'code' }); ui(); }
+      if (a.dataset.a === 'copy') { try { navigator.clipboard.writeText(myCode).then(() => toast('Code copied. Paste it in DM to @onecommentworld.'), () => toast('Copy didn\'t work here: type ' + myCode)); } catch (x) { toast('Type ' + myCode + ' in DM'); } }
+      if (a.dataset.a === 'dm' && DEMO && ws && ws.verify) ws.verify();
+    });
     $('.sph-x').onclick = closeSphere;
     addEventListener('keydown', e => { if (open && e.key === 'Escape') closeSphere(); });
   }
@@ -389,7 +438,8 @@
     try { history.replaceState(null, '', location.pathname + location.search + '#sphere'); } catch (e) { }
   }
   function closeSphere() {
-    endStroke(); open = false; ov.hidden = true; document.body.classList.remove('sph-open');
+    endStroke(); open = false; ov.hidden = true; document.body.classList.remove('sph-open'); mapDirty = true;
+    if (site && site.api) { const v = site.api.view; site.go(v.x, v.y, v.h); }
     try { if (location.hash === '#sphere') history.replaceState(null, '', location.pathname + location.search); } catch (e) { }
   }
   window.OCW_SPHERE = { open: openSphere, close: closeSphere, fly: flyToSphere, get pos() { return pos; }, get host() { return host; }, get strokes() { return strokes; }, view: () => view };
