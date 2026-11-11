@@ -6,7 +6,7 @@
   const QS = new URLSearchParams(location.search);
   let toastT = null;
   function toast(t) { const el = document.getElementById('toast'); if (!el) return; el.textContent = t; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 3200); }
-  const SERVER = (QS.get('sphere') || 'https://ocw-sphere.onecommentworld.workers.dev').replace(/\/$/, '');
+  const SERVER = (QS.get('sphere') || 'https://ocw-sphere.matteopirone1123.workers.dev').replace(/\/$/, '');
   const ADMIN = QS.get('admin');
   const DEMO = SERVER === 'demo';      // ?sphere=demo : no server, fake people drawing (to try it out)
   const W = 4096, H = 2048, TW = 4096, TH = 2048, SC = TW / W;   // drawing texture at full resolution (1 unit = 1 px)

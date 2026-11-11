@@ -9,3 +9,6 @@ class_name = "Sphere"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Sphere"]
+
+[vars]
+REQUIRE_FOLLOW = "1"
