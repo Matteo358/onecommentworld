@@ -9,7 +9,7 @@
 // WS  C->S {t:"hello",dev}  {t:"p",k,c,w,p:[x,y,...]}  {t:"e",k}
 //     S->C {t:"me",...}  {t:"b",n,d,dr:[[id,c,w,[pts]]...]}  {t:"del",ids}  {t:"wipe"}  {t:"no",why}
 
-const W = 4096, H = 2048;
+const W = 4096, H = 2048, NOD = Math.round(H * 125 / 180);   // below NOD (35°S, the bottom of the sphere) nobody can draw
 const LIFE = 24 * 3600e3, DRAW = 7 * 60e3, GRACE = 8e3, BAN = 7 * 24 * 3600e3;
 const PER_IP_DEFAULT = 3;                 // drawings per IP per 24 h (several phones can share one mobile IP)
 const MAX_PTS_MSG = 240, MAX_PTS_S = 90, COLORS = 16, WIDTHS = 3;
@@ -165,6 +165,7 @@ export class Sphere {
       const allow = Math.floor(a.budget) * 2; if (p.length > allow) p = p.slice(0, allow);
       p = p.map((x, i) => Math.max(0, Math.min(i % 2 ? H - 1 : W - 1, x | 0)));
       if (p.length % 2) p.pop();
+      { const q = []; for (let i = 0; i < p.length; i += 2) if (p[i + 1] < NOD) q.push(p[i], p[i + 1]); p = q; }
       if (!p.length) { ws.serializeAttachment(a); return; }
       a.budget -= p.length / 2;
       const k = String(m.k).slice(0, 12);
