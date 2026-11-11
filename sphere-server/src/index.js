@@ -50,6 +50,7 @@ export class Sphere {
       CREATE TABLE IF NOT EXISTS hooks(id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER, body TEXT);`);
     try { this.sql.exec('ALTER TABLE verified ADD COLUMN house INTEGER'); } catch (e) { }
     this.sql.exec('CREATE TABLE IF NOT EXISTS pend(igid TEXT PRIMARY KEY, user TEXT, dev TEXT, t INTEGER)');
+    this.sql.exec('CREATE TABLE IF NOT EXISTS fol(igid TEXT PRIMARY KEY, user TEXT, t INTEGER)');   // Instagram ids already confirmed as followers
     this.houses = null; this.housesAt = 0;
     this.strokes = null;          // id -> {id,dev,t,c,w,pts:number[],dirty}
     this.out = []; this.outDel = []; this.timer = null; this.ink = new Map();   // dev -> {v, dirty}
@@ -159,6 +160,8 @@ export class Sphere {
     this.sql.exec('DELETE FROM pend WHERE t < ?', Date.now() - 7 * 24 * 3600e3);
     this.sql.exec('INSERT OR REPLACE INTO pend(igid,user,dev,t) VALUES(?,?,?,?)', String(au.id), user, c.dev, Date.now());
     this.sql.exec('DELETE FROM codes WHERE code=?', mt[1].toUpperCase());
+    // PostZen DMs each person only once per automation: someone already confirmed (new phone, new day) is unlocked right away
+    if ([...this.sql.exec('SELECT 1 FROM fol WHERE igid=?', String(au.id))].length) return this.unlock(String(au.id));
     this.push(c.dev, { t: 'pend', user: '@' + user });
     return { matched: true, pending: '@' + user };
   }
@@ -168,10 +171,14 @@ export class Sphere {
     const mark = this.env.UNLOCK_MARK || 'Sphere unlocked';
     if (m.source !== 'automation' || !m.recipientId || !String(m.text || '').includes(mark)) return { matched: false };
     if (this.env.SPHERE_AUTOMATION && m.automationId !== this.env.SPHERE_AUTOMATION) return { matched: false };
-    const p = [...this.sql.exec('SELECT user,dev FROM pend WHERE igid=?', String(m.recipientId))][0]; if (!p) return { matched: false, pend: false };
+    this.sql.exec('INSERT OR REPLACE INTO fol(igid,user,t) VALUES(?,?,?)', String(m.recipientId), '', Date.now());
+    return this.unlock(String(m.recipientId));
+  }
+  async unlock(igid) {
+    const p = [...this.sql.exec('SELECT user,dev FROM pend WHERE igid=?', igid)][0]; if (!p) return { matched: false, pend: false };
     const hs = await this.houseSet(), house = hs ? (hs.has(p.user) ? 1 : 0) : null;
     this.sql.exec('INSERT OR REPLACE INTO verified(dev,user,follower,t,house) VALUES(?,?,?,?,?)', p.dev, '@' + p.user, 1, Date.now(), house);
-    this.sql.exec('DELETE FROM pend WHERE igid=?', String(m.recipientId));
+    this.sql.exec('DELETE FROM pend WHERE igid=?', igid);
     this.refresh(p.dev);
     return { matched: true, user: '@' + p.user, follower: 1, house };
   }

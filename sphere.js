@@ -296,7 +296,7 @@
     else if (st === 'ipfull') t = 'Too many drawings from this connection today. Try tomorrow!';
     else if (st === 'nohouse') t = `<b>${esc(me.user || '')}</b>, the Sphere is for people with a house on the map. Comment your city under our latest reel to get yours (new houses every 12 h), then send a new code.<div class="sph-code"><button type="button" data-a="code">Get a new code</button></div>`;
     else if (st === 'verify' || st === 'notfollower') {
-      const head = st === 'verify' ? '<b>Followers only.</b> Comment this code under the Sphere reel, then tap the button in the DM we send you:'
+      const head = st === 'verify' ? '<b>Followers only.</b> Comment this code under any of our reels, then tap the button in the DM we send you:'
         : `<b>${esc(me.user || '')}</b>, you don't follow @onecommentworld yet. Follow, then send a new code:`;
       t = `${head}<div class="sph-code">${myCode && st === 'verify' ? `<b class="sph-c-txt">${esc(myCode)}</b><button type="button" data-a="copy">Copy</button><a href="${REEL}" target="_blank" rel="noopener" data-a="dm">Open the reel</a>`
         : '<button type="button" data-a="code">Get my code</button>'}</div>` + (myCode && st === 'verify' ? (pendUser ? `<small>Got your comment, <b>${esc(pendUser)}</b>! Open your DMs from @onecommentworld and tap the button. Not following yet? Follow first. It unlocks here by itself.</small>` : '<small>It unlocks here by itself once you follow and tap the button in our DM.</small>') : '');
