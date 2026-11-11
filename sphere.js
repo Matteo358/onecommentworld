@@ -250,6 +250,17 @@
     <div class="sph-top">
       <button class="sph-x" type="button" aria-label="Close the Sphere">✕</button>
       <div class="sph-title"><b>THE SPHERE</b><span class="sph-live"><span class="dot"></span><span id="sph-n">connecting…</span></span></div>
+      <button class="sph-rules-btn" type="button" aria-expanded="false">Rules</button>
+    </div>
+    <div class="sph-rules" hidden>
+      <b>Sphere rules</b>
+      <ul>
+        <li>No ads, brands, sponsors, logos or links. Promo drawings get removed.</li>
+        <li>No hate, nudity, or anyone's personal info.</li>
+        <li>Drawing over others is allowed. Ruining a whole country's flag on purpose is not.</li>
+        <li>Break a rule: your drawing is deleted and you can't draw for 7 days.</li>
+      </ul>
+      <button type="button" class="sph-rules-ok">Got it</button>
     </div>
     <div class="sph-stage"><canvas class="sph-c" aria-label="The Sphere: drag to turn it, draw on it"></canvas><div class="sph-rect" hidden></div></div>
     <div class="sph-bar">
@@ -428,6 +439,11 @@
       if (a.dataset.a === 'dm' && DEMO && ws && ws.verify) ws.verify();
     });
     $('.sph-x').onclick = closeSphere;
+    const rb = $('.sph-rules-btn'), rbox = $('.sph-rules');
+    const showRules = on => { rbox.hidden = !on; rb.setAttribute('aria-expanded', on); if (!on) try { localStorage.setItem('sph-rules', '1'); } catch (e) {} };
+    rb.onclick = () => showRules(rbox.hidden); $('.sph-rules-ok').onclick = () => showRules(false);
+    let seen = false; try { seen = !!localStorage.getItem('sph-rules'); } catch (e) {}
+    if (!seen) showRules(true);
     addEventListener('keydown', e => { if (open && e.key === 'Escape') closeSphere(); });
   }
   function openSphere() {
