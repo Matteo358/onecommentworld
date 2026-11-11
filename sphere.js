@@ -7,7 +7,8 @@
   const SERVER = (QS.get('sphere') || 'https://ocw-sphere.onecommentworld.workers.dev').replace(/\/$/, '');
   const ADMIN = QS.get('admin');
   const DEMO = SERVER === 'demo';      // ?sphere=demo : no server, fake people drawing (to try it out)
-  const W = 4096, H = 2048, TW = 2048, TH = 1024, SC = TW / W;
+  const W = 4096, H = 2048, TW = 4096, TH = 2048, SC = TW / W;   // drawing texture at full resolution (1 unit = 1 px)
+  const NOD = Math.round(H * 125 / 180);   // below 35°S (the bottom of the sphere) nobody can draw: you couldn't see it from the map
   const LIFE = 24 * 3600e3, FADE = 3600e3;
   const COLORS = ['#ffffff', '#ffcf3f', '#ff9f1c', '#ff4d4d', '#ff5fa2', '#b06bff', '#4d7cff', '#38c6ff',
                   '#2ee6c5', '#7fc25d', '#3a9a3f', '#c98a4b', '#f1c9a5', '#9aa7ad', '#ff2e2e', '#111111'];
@@ -19,16 +20,27 @@
   const strokes = new Map();           // id -> {c,w,pts:[], t0 (local ms of birth)}
   const tex = document.createElement('canvas'); tex.width = TW; tex.height = TH;
   const g = tex.getContext('2d');
-  let texDirty = true, textures = [];
+  let texDirty = true, textures = [], mapDirty = true;
+  const small = document.createElement('canvas'); small.width = 2048; small.height = 1024;   // the sphere on the map is small: half resolution is plenty
+  const sg = small.getContext('2d');
   function paintBg() {
     g.globalAlpha = 1; g.fillStyle = BG; g.fillRect(0, 0, TW, TH);
+    // the no-drawing zone at the bottom: dark band with faint hazard stripes and a yellow edge
+    g.save(); g.beginPath(); g.rect(0, NOD * SC, TW, TH - NOD * SC); g.clip();
+    g.fillStyle = '#081117'; g.fillRect(0, NOD * SC, TW, TH);
+    g.strokeStyle = 'rgba(255,207,63,.10)'; g.lineWidth = 18 * SC;
+    for (let x = -TH; x < TW; x += 64 * SC) { g.beginPath(); g.moveTo(x, NOD * SC); g.lineTo(x + TH, NOD * SC + TH); g.stroke(); }
+    g.restore();
+    g.fillStyle = 'rgba(255,207,63,.55)'; g.fillRect(0, NOD * SC - 3 * SC, TW, 6 * SC);
     // LED grid: faint meridians and parallels
-    g.strokeStyle = 'rgba(120,180,200,.08)'; g.lineWidth = 1;
-    for (let x = 0; x < TW; x += TW / 48) { g.beginPath(); g.moveTo(x + .5, 0); g.lineTo(x + .5, TH); g.stroke(); }
-    for (let y = 0; y < TH; y += TH / 24) { g.beginPath(); g.moveTo(0, y + .5); g.lineTo(TW, y + .5); g.stroke(); }
+    g.strokeStyle = 'rgba(120,180,200,.08)'; g.lineWidth = 2 * SC;
+    for (let x = 0; x < TW; x += TW / 48) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, NOD * SC); g.stroke(); }
+    for (let y = 0; y < NOD * SC; y += TH / 24) { g.beginPath(); g.moveTo(0, y); g.lineTo(TW, y); g.stroke(); }
     // faint screen text around the equator, like the real Sphere when it's idle
     g.fillStyle = 'rgba(56,198,255,.16)'; g.font = `400 ${TH / 15}px "Lilita One","Arial Rounded MT Bold",sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
-    for (let i = 0; i < 2; i++) g.fillText('THE SPHERE  ·  ONE COMMENT WORLD', TW * (0.25 + i * 0.5), TH / 2);
+    for (let i = 0; i < 2; i++) g.fillText('THE SPHERE  ·  ONE COMMENT WORLD', TW * (0.25 + i * 0.5), TH * 0.42);
+    g.fillStyle = 'rgba(255,207,63,.28)'; g.font = `400 ${TH / 32}px "Lilita One","Arial Rounded MT Bold",sans-serif`;
+    for (let i = 0; i < 4; i++) g.fillText('NO DRAWING ZONE', TW * (0.125 + i * 0.25), (NOD + 70) * SC);
   }
   function alphaOf(s, now) { const age = now - s.t0; return age > LIFE ? 0 : age > LIFE - FADE ? (LIFE - age) / FADE : 1; }
   function seg(s, from, alpha) {         // draw points [from..] of stroke s (from = index of a point, in numbers)
@@ -44,12 +56,12 @@
   function redraw() {
     const now = Date.now(); paintBg();
     for (const [id, s] of strokes) { const a = alphaOf(s, now); if (a <= 0) { strokes.delete(id); continue; } seg(s, 0, a); }
-    texDirty = true;
+    texDirty = mapDirty = true;
   }
   function addPts(id, c, w, pts, t0) {
     let s = strokes.get(id);
     if (!s) { s = { c, w, pts: [], t0: t0 || Date.now() }; strokes.set(id, s); }
-    const from = s.pts.length; s.pts.push(...pts); seg(s, from, alphaOf(s, Date.now())); texDirty = true;
+    const from = s.pts.length; s.pts.push(...pts); seg(s, from, alphaOf(s, Date.now())); texDirty = mapDirty = true;
   }
   paintBg();
   setInterval(redraw, 60e3);            // fading and the 24 h expiry
@@ -119,7 +131,7 @@
     strokes.clear(); const now = Date.now();
     for (let i = 0; i < 70; i++) {
       const age = rnd(0, 24) * 3600e3;
-      for (const [c, w, pts] of shape(pick(KINDS), rnd(80, W - 80), rnd(420, H - 420), rnd(25, 70))) strokes.set(demoId++, { c, w, pts, t0: now - age });
+      for (const [c, w, pts] of shape(pick(KINDS), rnd(80, W - 80), rnd(260, NOD - 160), rnd(25, 70))) strokes.set(demoId++, { c, w, pts, t0: now - age });
     }
   }
   class FakeWS {
@@ -132,7 +144,7 @@
     tick() {
       while (this.bots.length < 24) {            // the side facing you gets the most people, so you see them draw
         const near = view && Math.random() < .7, u = near ? ((0.25 - view.yaw / (Math.PI * 2)) % 1 + 1) % 1 : Math.random();
-        const sk = shape(pick(KINDS), Math.round(u * W + rnd(-500, 500) + W) % W, rnd(500, H - 500), rnd(25, 70));
+        const sk = shape(pick(KINDS), Math.round(u * W + rnd(-500, 500) + W) % W, rnd(330, NOD - 200), rnd(25, 70));
         this.bots.push({ q: sk.map(([c, w, p]) => ({ id: demoId++, c, w, p, i: 0 })), wait: Math.floor(rnd(0, 30)) });
       }
       const dr = [];
@@ -163,11 +175,11 @@
     for (const c of v.civic || []) minX = Math.min(minX, c.x - (c.w || 22));
     const lx = minX - 40 - R_M * 1.6, ly = 0, s = v.k / 1000;          // west of the houses (the airport is east)
     pos = { x: v.cx + lx * s, y: v.cy + ly * s, r: R_M * s };
-    const tx = new THREE.CanvasTexture(tex); tx.colorSpace = THREE.SRGBColorSpace; tx.anisotropy = 4; textures.push(tx);
+    const tx = new THREE.CanvasTexture(small); tx.colorSpace = THREE.SRGBColorSpace; tx.anisotropy = 4; let lastCopy = 0;
     const grp = new THREE.Group();
     mesh = new THREE.Mesh(new THREE.SphereGeometry(pos.r, 64, 32), new THREE.MeshLambertMaterial({ color: 0x2a4652, emissive: 0xffffff, emissiveMap: tx }));
     mesh.castShadow = true;
-    mesh.position.y = pos.r * 1.02; mesh.rotation.x = Math.PI / 2;     // poles lie flat: from above you see the drawing band
+    mesh.position.y = pos.r * 1.02;                                     // standing straight on the ground, like the real one
     const plaza = new THREE.Mesh(new THREE.CylinderGeometry(pos.r * 1.45, pos.r * 1.5, pos.r * 0.04, 48), new THREE.MeshLambertMaterial({ color: 0xcfd6d2 }));
     plaza.position.y = pos.r * 0.02; plaza.receiveShadow = true;
     const ring = new THREE.Mesh(new THREE.TorusGeometry(pos.r * 1.32, pos.r * 0.035, 8, 64), new THREE.MeshBasicMaterial({ color: 0xffcf3f }));
@@ -179,8 +191,8 @@
       const vw = api.view;
       grp.position.set(pos.x - vw.x, 0, -(pos.y - vw.y));
       grp.visible = vw.h < 60;
-      mesh.rotation.z = (performance.now() / 1000) * (Math.PI * 2 / 240);   // one turn every 4 minutes
-      if (texDirty) { textures.forEach(t => t.needsUpdate = true); texDirty = false; }
+      mesh.rotation.y = (performance.now() / 1000) * (Math.PI * 2 / 240);   // one turn every 4 minutes
+      if (mapDirty && grp.visible && performance.now() - lastCopy > 250) { sg.drawImage(tex, 0, 0, 2048, 1024); tx.needsUpdate = true; mapDirty = false; lastCopy = performance.now(); }
       r0.apply(this, arguments);
       mapBadge();
     };
@@ -193,17 +205,17 @@
   function mapBadge() {
     if (!pos || !site) return; const api = site.api, vw = api.view;
     if (vw.h > 60) { badge.hidden = true; return; }
-    const [sx, sy, z] = api.project(pos.x, pos.y, pos.r * 2.3);
+    const [sx, sy, z] = api.project(pos.x, pos.y - pos.r * 1.55, 0);   // on the plaza, in front of the sphere
     const mapEl = document.getElementById('map'), W0 = mapEl.clientWidth, H0 = mapEl.clientHeight;
     if (z > 1 || sx < -50 || sy < -50 || sx > W0 + 50 || sy > H0 + 50) { badge.hidden = true; return; }
-    badge.hidden = false; badge.style.transform = `translate(${sx | 0}px,${sy | 0}px) translate(-50%,-100%)`;
+    badge.hidden = false; badge.style.transform = `translate(${sx | 0}px,${sy | 0}px) translate(-50%,-30%)`;
     // live connection only when the sphere is on screen
     if (!wsWant) want(true); lastSeen = Date.now();
   }
   let lastSeen = 0;
   setInterval(() => { if (wsWant && !open && Date.now() - lastSeen > 30000) want(false); }, 5000);
   // keep the map redrawing while strokes arrive and the sphere is visible
-  setInterval(() => { if (site && site.api && texDirty && !badge.hidden) { const v = site.api.view; site.go(v.x, v.y, v.h); } }, 120);
+  setInterval(() => { if (site && site.api && mapDirty && !badge.hidden) { const v = site.api.view; site.go(v.x, v.y, v.h); } }, 120);
 
   // the 🎨 button with the map controls
   function addButton() {
@@ -286,7 +298,7 @@
     const sph = new THREE.Mesh(new THREE.SphereGeometry(1, 128, 64), new THREE.MeshBasicMaterial({ map: tx }));
     const glow = new THREE.Mesh(new THREE.SphereGeometry(1.06, 48, 24), new THREE.MeshBasicMaterial({ color: 0x38c6ff, transparent: true, opacity: .08, side: THREE.BackSide }));
     scene.add(sph, glow);
-    const v = { renderer, scene, cam, sph, yaw: 0, pitch: 0, z: 1, ray: new THREE.Raycaster(), THREE };   // z: 1 = whole sphere, small = close up
+    const v = { renderer, scene, cam, sph, yaw: 0, pitch: 0.3, z: 1, ray: new THREE.Raycaster(), THREE };   // z: 1 = whole sphere, small = close up
     v.size = () => { const r = cv.parentElement.getBoundingClientRect(); renderer.setSize(r.width, r.height, false); cam.aspect = r.width / r.height; cam.updateProjectionMatrix(); v.W = r.width; v.H = r.height; };
     v.frame = () => {
       if (!open) return;
@@ -294,14 +306,15 @@
       const half = Math.min(17.5, Math.atan(Math.tan(17.5 * Math.PI / 180) * v.W / v.H) * 180 / Math.PI) * Math.PI / 180;
       const fit = 1.1 / Math.sin(half);                      // distance that shows the whole sphere
       cam.position.set(0, 0, 1 + (fit - 1) * v.z); cam.near = 0.01; cam.updateProjectionMatrix(); cam.lookAt(0, 0, 0);
-      if (texDirty) { textures.forEach(t => t.needsUpdate = true); texDirty = false; }
+      if (texDirty && performance.now() - (v.up || 0) > 80) { textures.forEach(t => t.needsUpdate = true); texDirty = false; v.up = performance.now(); }   // 4096 px: upload at most ~12 times a second
       renderer.render(scene, cam); requestAnimationFrame(v.frame);
     };
     // screen point -> canvas units on the sphere
     v.pick = (cx, cy) => {
       const r = cv.getBoundingClientRect(), nd = new THREE.Vector2((cx - r.left) / r.width * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
       v.ray.setFromCamera(nd, cam); const h = v.ray.intersectObject(sph)[0]; if (!h) return null;
-      return { x: Math.max(0, Math.min(W - 1, Math.round(h.uv.x * W))), y: Math.max(0, Math.min(H - 1, Math.round((1 - h.uv.y) * H))) };
+      const y = Math.round((1 - h.uv.y) * H); if (y >= NOD - 2) return null;
+      return { x: Math.max(0, Math.min(W - 1, Math.round(h.uv.x * W))), y: Math.max(0, y) };
     };
     addEventListener('resize', () => open && v.size());
     return v;
@@ -362,8 +375,8 @@
     };
     cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
     cv.addEventListener('wheel', e => { e.preventDefault(); view.z = Math.max(0.03, Math.min(1, view.z * Math.exp(e.deltaY * 0.0015))); }, { passive: false });
-    ov.querySelectorAll('.sph-modes button').forEach(b => b.onclick = () => { pen.mode = b.dataset.m; if (pen.mode === 'draw' && view.z > 0.5) view.z = 0.35; ui(); });
-    ov.querySelectorAll('.sph-pal button').forEach(b => b.onclick = () => { pen.c = +b.dataset.c; if (pen.mode === 'move' && !$('[data-m="draw"]').disabled) pen.mode = 'draw'; ui(); });
+    ov.querySelectorAll('.sph-modes button').forEach(b => b.onclick = () => { pen.mode = b.dataset.m; if (pen.mode === 'draw' && view.z > 0.5) view.z = 0.4; ui(); });
+    ov.querySelectorAll('.sph-pal button').forEach(b => b.onclick = () => { pen.c = +b.dataset.c; if (pen.mode === 'move' && !$('[data-m="draw"]').disabled) { pen.mode = 'draw'; if (view.z > 0.5) view.z = 0.4; } ui(); });
     ov.querySelectorAll('.sph-w button').forEach(b => b.onclick = () => { pen.w = +b.dataset.w; ui(); });
     $('.sph-x').onclick = closeSphere;
     addEventListener('keydown', e => { if (open && e.key === 'Escape') closeSphere(); });
