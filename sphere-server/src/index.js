@@ -15,6 +15,8 @@
 // So the site gives a code, the person DMs it to @onecommentworld, PostZen forwards the DM here,
 // and we learn their @ (and whether they follow, when the payload says so). Then: 1 drawing per @ per 24 h.
 // env FOLLOW_UNKNOWN=deny refuses people whose follow status the payload doesn't carry (default: allow).
+// PostZen's payload does NOT carry the follow status (checked 2026-11-11), so with REQUIRE_HOUSE=1 only people
+// who already have a house on the map can draw (their @ is in the site's index.html, HOUSES_URL).
 
 const W = 4096, H = 2048, NOD = Math.round(H * 125 / 180);   // below NOD (35°S, the bottom of the sphere) nobody can draw
 const LIFE = 24 * 3600e3, DRAW = 7 * 60e3, GRACE = 8e3, BAN = 7 * 24 * 3600e3;
@@ -40,9 +42,11 @@ export class Sphere {
       CREATE TABLE IF NOT EXISTS sessions(dev TEXT PRIMARY KEY, ip TEXT, start INTEGER, ink REAL DEFAULT 0);
       CREATE TABLE IF NOT EXISTS bans(who TEXT PRIMARY KEY, until INTEGER);
       CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY, v INTEGER);
-      CREATE TABLE IF NOT EXISTS verified(dev TEXT PRIMARY KEY, user TEXT, follower INTEGER, t INTEGER);
+      CREATE TABLE IF NOT EXISTS verified(dev TEXT PRIMARY KEY, user TEXT, follower INTEGER, t INTEGER, house INTEGER);
       CREATE TABLE IF NOT EXISTS codes(code TEXT PRIMARY KEY, dev TEXT, t INTEGER);
       CREATE TABLE IF NOT EXISTS hooks(id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER, body TEXT);`);
+    try { this.sql.exec('ALTER TABLE verified ADD COLUMN house INTEGER'); } catch (e) { }
+    this.houses = null; this.housesAt = 0;
     this.strokes = null;          // id -> {id,dev,t,c,w,pts:number[],dirty}
     this.out = []; this.outDel = []; this.timer = null; this.ink = new Map();   // dev -> {v, dirty}
   }
@@ -96,7 +100,7 @@ export class Sphere {
       this.sql.exec('INSERT INTO hooks(t,body) VALUES(?,?)', Date.now(), body.slice(0, 8000));
       this.sql.exec('DELETE FROM hooks WHERE id <= (SELECT MAX(id) - 30 FROM hooks)');
       let j; try { j = JSON.parse(body); } catch { return json({ ok: true, matched: false }); }
-      return json({ ok: true, ...this.onDM(j) });
+      return json({ ok: true, ...(await this.onDM(j)) });
     }
     if (url.pathname === '/admin/hooks') {
       if (!this.env.ADMIN_KEY || url.searchParams.get('key') !== this.env.ADMIN_KEY) return json({ ok: false }, 403);
@@ -131,13 +135,21 @@ export class Sphere {
   }
 
   // a DM forwarded by PostZen: find the code, the sender's @ and (if present) whether they follow the account
-  onDM(j) {
+  async houseSet() {   // every @ that has a house on the map, from the public site (refreshed every 30 min)
+    if (this.houses && Date.now() - this.housesAt < 30 * 60e3) return this.houses;
+    try {
+      const r = await fetch(this.env.HOUSES_URL || 'https://matteo358.github.io/onecommentworld/index.html', { cf: { cacheTtl: 300 } });
+      if (r.ok) { const t = await r.text(), set = new Set(); for (const m of t.matchAll(/"@([A-Za-z0-9._]+)"/g)) set.add(m[1].toLowerCase()); if (set.size > 100) { this.houses = set; this.housesAt = Date.now(); } }
+    } catch (e) { }
+    return this.houses;
+  }
+  async onDM(j) {
     const texts = [], users = [], follows = [];
     const walk = (o, k, d) => {
       if (d > 8 || o == null) return;
       if (typeof o === 'string') {
         if (/^(text|message|body|content|caption)$/i.test(k)) texts.push(o);
-        if (/user.?name|handle|^login$/i.test(k)) users.push(o);
+        if (/user.?name|handle|^login$|^sender.?name$/i.test(k)) users.push(o);
       } else if (typeof o === 'boolean') {
         if (/is_?user_?follow_?business|follows?_?(you|us|business|account)|is_?follower|follower$/i.test(k)) follows.push(o);
       } else if (typeof o === 'object') for (const [kk, v] of Object.entries(o)) walk(v, kk, d + 1);
@@ -149,10 +161,12 @@ export class Sphere {
     const user = (users.find(u => u && !/onecommentworld/i.test(u)) || '').replace(/^@/, '').toLowerCase().replace(/[^a-z0-9._]/g, '').slice(0, 40);
     if (!c || !user) return { matched: false, code: !!c, user: !!user };
     const follower = follows.length ? (follows[0] ? 1 : 0) : null;
-    this.sql.exec('INSERT OR REPLACE INTO verified(dev,user,follower,t) VALUES(?,?,?,?)', c.dev, '@' + user, follower, Date.now());
+    const hs = this.env.REQUIRE_HOUSE === '1' ? await this.houseSet() : null;
+    const house = hs ? (hs.has(user) ? 1 : 0) : null;          // null = list unavailable: don't block
+    this.sql.exec('INSERT OR REPLACE INTO verified(dev,user,follower,t,house) VALUES(?,?,?,?,?)', c.dev, '@' + user, follower, Date.now(), house);
     this.sql.exec('DELETE FROM codes WHERE code=?', mt[1].toUpperCase());
     for (const ws of this.state.getWebSockets()) { const a = ws.deserializeAttachment(); if (a && a.dev === c.dev) { this.me(ws, a); ws.serializeAttachment(a); } }
-    return { matched: true, user: '@' + user, follower };
+    return { matched: true, user: '@' + user, follower, house };
   }
 
   encodeState() {
@@ -170,14 +184,15 @@ export class Sphere {
   }
 
   who(a) {   // the identity that limits and bans apply to
-    const v = [...this.sql.exec('SELECT user,follower FROM verified WHERE dev=?', a.dev)][0];
-    a.user = v ? v.user : null; a.follower = v ? v.follower : null;
+    const v = [...this.sql.exec('SELECT user,follower,house FROM verified WHERE dev=?', a.dev)][0];
+    a.user = v ? v.user : null; a.follower = v ? v.follower : null; a.house = v ? v.house : null;
     return v ? 'u:' + v.user : a.dev;
   }
   needsVerify(a) {
     if (this.env.REQUIRE_FOLLOW !== '1') return null;
     if (!a.user) return 'verify';
     if (a.follower === 0 || (a.follower == null && this.env.FOLLOW_UNKNOWN === 'deny')) return 'notfollower';
+    if (this.env.REQUIRE_HOUSE === '1' && a.house === 0) return 'nohouse';
     return null;
   }
   session(dev) { return [...this.sql.exec('SELECT ip,start,ink FROM sessions WHERE dev=?', dev)][0]; }

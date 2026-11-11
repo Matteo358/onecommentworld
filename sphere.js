@@ -290,13 +290,14 @@
     else if (st === 'done' || st === 'inkout') t = `Your drawing is on the Sphere ✨ Next one in <b>${fmt(me.next || (LIFE - (me.draw || 0)))}</b>.`;
     else if (st === 'banned') t = 'You can\'t draw on the Sphere right now.';
     else if (st === 'ipfull') t = 'Too many drawings from this connection today. Try tomorrow!';
+    else if (st === 'nohouse') t = `<b>${esc(me.user || '')}</b>, the Sphere is for people with a house on the map. Comment your city under our latest reel to get yours (new houses every 12 h), then send a new code.<div class="sph-code"><button type="button" data-a="code">Get a new code</button></div>`;
     else if (st === 'verify' || st === 'notfollower') {
-      const head = st === 'verify' ? '<b>Followers only.</b> Follow @onecommentworld, then send this code in DM to unlock your drawing:'
+      const head = st === 'verify' ? '<b>Only for people with a house.</b> Send this code in DM to @onecommentworld from the account that has a house:'
         : `<b>${esc(me.user || '')}</b>, you don't follow @onecommentworld yet. Follow, then send a new code:`;
       t = `${head}<div class="sph-code">${myCode && st === 'verify' ? `<b class="sph-c-txt">${esc(myCode)}</b><button type="button" data-a="copy">Copy</button><a href="https://ig.me/m/onecommentworld" target="_blank" rel="noopener" data-a="dm">Open DM</a>`
         : '<button type="button" data-a="code">Get my code</button>'}</div>` + (myCode && st === 'verify' ? '<small>It unlocks here by itself a few seconds after you send it.</small>' : '');
     }
-    if (st !== 'verify' && st !== 'notfollower' && me && me.user) t += ` <small class="sph-who">Drawing as <b>${esc(me.user)}</b></small>`;
+    if (st !== 'verify' && st !== 'notfollower' && st !== 'nohouse' && me && me.user) t += ` <small class="sph-who">Drawing as <b>${esc(me.user)}</b></small>`;
     if (msg.dataset.t !== t) { msg.innerHTML = t; msg.dataset.t = t; }
     meter.hidden = st !== 'active' && st !== 'new';
     if (!meter.hidden) {
@@ -434,7 +435,7 @@
     ov.querySelectorAll('.sph-w button').forEach(b => b.onclick = () => { pen.w = +b.dataset.w; ui(); });
     $('#sph-msg').addEventListener('click', e => {
       const a = e.target.closest('[data-a]'); if (!a) return;
-      if (a.dataset.a === 'code') { if (me && me.state === 'notfollower') me.state = 'verify'; myCode = null; send({ t: 'code' }); ui(); }
+      if (a.dataset.a === 'code') { if (me && (me.state === 'notfollower' || me.state === 'nohouse')) me.state = 'verify'; myCode = null; send({ t: 'code' }); ui(); }
       if (a.dataset.a === 'copy') { try { navigator.clipboard.writeText(myCode).then(() => toast('Code copied. Paste it in DM to @onecommentworld.'), () => toast('Copy didn\'t work here: type ' + myCode)); } catch (x) { toast('Type ' + myCode + ' in DM'); } }
       if (a.dataset.a === 'dm' && DEMO && ws && ws.verify) ws.verify();
     });
