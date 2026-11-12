@@ -3,6 +3,7 @@
 .sph-badge{position:absolute;left:0;top:0;z-index:5;pointer-events:auto;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;
   padding:6px 12px 7px;border-radius:14px;border:2px solid #06202b;background:#38c6ff;color:#06202b;font:400 15px/1 var(--display);letter-spacing:.6px;
   box-shadow:0 3px 0 #06202b;white-space:nowrap}
+.sph-badge[hidden]{display:none}
 .sph-badge small{font:700 10.5px/1.1 var(--body);letter-spacing:0;opacity:.85}
 .sph-badge .dot,.sph-live .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#ff3b3b;margin-right:6px;vertical-align:1px;animation:sph-pulse 1.2s infinite}
 .sph-badge .dot{position:absolute;left:-4px;top:-4px;margin:0;border:2px solid #06202b;width:10px;height:10px}

@@ -220,6 +220,8 @@
     const [sx, sy, z] = api.project(pos.x, pos.y - pos.r * 1.55, 0);   // on the plaza, in front of the sphere
     const mapEl = document.getElementById('map'), W0 = mapEl.clientWidth, H0 = mapEl.clientHeight;
     if (z > 1 || sx < -50 || sy < -50 || sx > W0 + 50 || sy > H0 + 50) { badge.hidden = true; return; }
+    const [ex, ey] = api.project(pos.x + pos.r, pos.y - pos.r * 1.55, 0);   // too far away to see the sphere: no label over the map
+    if (Math.hypot(ex - sx, ey - sy) < 7) { badge.hidden = true; return; }
     badge.hidden = false; badge.style.transform = `translate(${sx | 0}px,${sy | 0}px) translate(-50%,-30%)`;
     // live connection only when the sphere is on screen
     if (!wsWant) want(true); lastSeen = Date.now();
