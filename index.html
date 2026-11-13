@@ -266,6 +266,7 @@ body,#labels .lbl{touch-action:none}
 .callout.vote{border:1px solid #f5c542}
 .callout.vote a{color:inherit;font-weight:800}
 .vote-steps{margin:0;padding-left:20px;display:grid;gap:6px;font-size:14px;line-height:1.4}
+.duel{display:flex;align-items:center;gap:8px;margin:10px 0}.duel>div{flex:1;min-width:0;background:var(--panel-2);border-radius:10px;padding:8px;text-align:center}.duel .dn{display:block;font:400 22px/1 var(--display);color:var(--sun)}.duel span{display:block;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.duel i{font-style:normal;font-weight:800;opacity:.7}
 
 .follow{position:absolute;left:50%;top:calc(var(--bar-h,64px) + 10px);transform:translateX(-50%);z-index:4;display:flex;align-items:center;gap:10px;background:#fff;border:2px solid #10232b;border-radius:16px;padding:8px 8px 8px 10px;box-shadow:0 4px 0 rgba(16,35,43,.25);max-width:min(420px,calc(100% - 32px));font:600 13px/1.25 Figtree,system-ui,sans-serif;color:#10232b}
 .follow .f-ava{font-size:22px;line-height:1}
@@ -3517,7 +3518,11 @@ function fmtDay(iso){ return new Date(iso).toLocaleString('en-US',{weekday:'shor
 function mayorSec(t){
   const e=electionFor(t), m=mayorInfo(t);
   const where=e&&e.url?`<a href="${esc(e.url)}" target="_blank" rel="noopener">the election post</a>`:'the Mayor election reel on <b>@onecommentworld</b>';
-  const vote=e?`<div class="callout vote">🗳️ <b>${new Date().toISOString()<e.open?'Mayor election starts '+fmtDay(e.open):'Mayor election is open'}.</b> Live in ${esc(t.nome)}? Comment <b>VOTE @username</b> under ${where}. Closes ${fmtDay(e.close)}.</div>`:'';
+  const head=e?`🗳️ <b>${new Date().toISOString()<e.open?'Mayor election starts '+fmtDay(e.open):'Mayor election is open'}.</b>`:'';
+  const duel=e&&e.candidates?`<div class="duel">${Object.entries(e.candidates).map(([k,u])=>`<div><b class="dn">${esc(k)}</b><span>${esc(u)}</span></div>`).join('<i>vs</i>')}</div>`:'';
+  const vote=!e?'':e.candidates
+    ?`<div class="callout vote">${head} ${duel}Comment <b>${Object.keys(e.candidates).join('</b> or <b>')}</b> under ${where}. Not in ${esc(t.nome)} yet? Comment <b>${esc(t.nome)} ${Object.keys(e.candidates)[0]}</b>: you move in and your vote counts. Closes ${fmtDay(e.close)}.</div>`
+    :`<div class="callout vote">${head} Live in ${esc(t.nome)}? Comment <b>VOTE @username</b> under ${where}. Closes ${fmtDay(e.close)}.</div>`;
   if(t.sindaco) return `<div class="mayor"><div class="crown">${CROWN.replace('currentColor','#2a2100')}</div><div><b>${esc(t.sindaco)}</b><span>Mayor of ${esc(t.nome)}${m?` · ${m.votes} of ${m.voters} votes · until ${new Date(m.until).toLocaleDateString('en-US',{day:'numeric',month:'short'})}`:''}</span></div></div>${vote}`;
   if(e) return vote;
   if(t.abitanti>=MAYOR_AT) return `<div class="callout vote">👑 <b>${esc(t.nome)} can elect a Mayor.</b> The next election opens in a post on @onecommentworld. Comment <b>VOTE @username</b> there.</div>`;
@@ -3891,7 +3896,7 @@ function renderBadges(){
 render = (orig => function(){ if (tab === 'badges') return renderBadges(); orig(); })(render);
 window.OCW_SITE_X = {towns: () => towns, follow: (u) => followUser(u), where: () => api && api.alive && api.alive.where()};
 
-const MAYORS={"mayors":[],"elections":[{"id":"E1","title":"First Mayor election","cities":"auto","open":"2026-11-10T18:00:00Z","close":"2026-11-12T18:00:00Z","url":"https://www.instagram.com/reel/DfkgAIagPa2/","status":"closed","post_ids":["18139096954725065","18220905277352342"],"result":"no mayor: 1 valid vote in 48h (Athens), min 3"}]};
+const MAYORS={"mayors":[],"elections":[{"id":"E1","title":"First Mayor election","cities":"auto","open":"2026-11-10T18:00:00Z","close":"2026-11-12T18:00:00Z","url":"https://www.instagram.com/reel/DfkgAIagPa2/","status":"closed","post_ids":["18139096954725065","18220905277352342"],"result":"no mayor: 1 valid vote in 48h (Athens), min 3"},{"id":"E2","title":"Stockholm Mayor duel","cities":["Stockholm"],"candidates":{"1":"@swedishbluelights","2":"@ralf_sfk_fotboll"},"open":"2026-11-14T07:00:00Z","close":"2026-11-16T07:00:00Z","url":null,"status":"open"}]};
 function pickCity(i){
   const g=geoIndex(); qEl.value=g.name[i]; qClear.hidden=false; closeResults(); qEl.blur();
   if(preview){ towns.splice(towns.indexOf(preview),1); preview=null; }
