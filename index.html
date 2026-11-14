@@ -4048,7 +4048,7 @@ function renderBadges(){
 render = (orig => function(){ if (tab === 'badges') return renderBadges(); orig(); })(render);
 window.OCW_SITE_X = {towns: () => towns, follow: (u) => followUser(u), where: () => api && api.alive && api.alive.where()};
 
-const MAYORS={"mayors":[],"elections":[{"id":"E1","title":"First Mayor election","cities":"auto","open":"2026-11-10T18:00:00Z","close":"2026-11-12T18:00:00Z","url":"https://www.instagram.com/reel/DfkgAIagPa2/","status":"closed","post_ids":["18139096954725065","18220905277352342"],"result":"no mayor: 1 valid vote in 48h (Athens), min 3"},{"id":"E2","title":"Stockholm Mayor duel","cities":["Stockholm"],"candidates":{"1":"@swedishbluelights","2":"@ralf_sfk_fotboll"},"open":"2026-11-14T07:00:00Z","close":"2026-11-16T07:00:00Z","url":null,"status":"open"}]};
+const MAYORS={"mayors":[],"elections":[{"id":"E1","title":"First Mayor election","cities":"auto","open":"2026-11-10T18:00:00Z","close":"2026-11-12T18:00:00Z","url":"https://www.instagram.com/reel/DfkgAIagPa2/","status":"closed","post_ids":["18139096954725065","18220905277352342"],"result":"no mayor: 1 valid vote in 48h (Athens), min 3"},{"id":"E2","title":"Stockholm Mayor duel","cities":["Stockholm"],"candidates":{"1":"@swedishbluelights","2":"@ralf_sfk_fotboll"},"open":"2026-11-14T07:00:00Z","close":"2026-11-16T07:00:00Z","url":"https://www.instagram.com/reel/DftnpbKFa3y/","status":"open","post_ids":["17888620038689307"]}]};
 function pickCity(i){
   const g=geoIndex(); qEl.value=g.name[i]; qClear.hidden=false; closeResults(); qEl.blur();
   if(preview){ towns.splice(towns.indexOf(preview),1); preview=null; }
