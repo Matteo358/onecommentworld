@@ -535,7 +535,7 @@ const towns = [
   T("Eindhoven","The Netherlands",51.441,5.478,7,"@koenpeeters15",null,7),
   T("Enschede","The Netherlands",52.218,6.896,4,"@tychobekkering",null,7),
   T("Sønderborg","Denmark",54.909,9.789,2,"@lmc_spotter",null,7),
-  T("Stockholm","Sweden",59.329,18.069,571,"@swedishbluelights",null,7),
+  T("Stockholm","Sweden",59.329,18.069,571,"@swedishbluelights","@swedishbluelights",7),
   T("Södertälje","Sweden",59.196,17.625,8,"@rasmusriikonenandersson",null,7),
   T("Lidköping","Sweden",58.505,13.158,5,"@alfredeskilsson",null,7),
   T("Totebo","Sweden",57.633,16.183,1,"@edwin_coolest",null,7),
@@ -4386,7 +4386,7 @@ function renderBadges(){
 render = (orig => function(){ if (tab === 'badges') return renderBadges(); orig(); })(render);
 window.OCW_SITE_X = {towns: () => towns, follow: (u) => followUser(u), where: () => api && api.alive && api.alive.where()};
 
-const MAYORS={"mayors":[],"elections":[{"id":"E1","title":"First Mayor election","cities":"auto","open":"2026-11-10T18:00:00Z","close":"2026-11-12T18:00:00Z","url":"https://www.instagram.com/reel/DfkgAIagPa2/","status":"closed","post_ids":["18139096954725065","18220905277352342"],"result":"no mayor: 1 valid vote in 48h (Athens), min 3"},{"id":"E2","title":"Stockholm Mayor duel","cities":["Stockholm"],"candidates":{"1":"@swedishbluelights","2":"@ralf_sfk_fotboll"},"open":"2026-11-14T07:00:00Z","close":"2026-11-16T07:00:00Z","url":"https://www.instagram.com/reel/DftnpbKFa3y/","status":"open","post_ids":["17888620038689307"]}]};
+const MAYORS={"mayors":[{"city":"Stockholm","cc":"SE","user":"@swedishbluelights","votes":16,"voters":21,"since":"2026-11-16","until":"2026-12-16","election":"E2"}],"elections":[{"id":"E1","title":"First Mayor election","cities":"auto","open":"2026-11-10T18:00:00Z","close":"2026-11-12T18:00:00Z","url":"https://www.instagram.com/reel/DfkgAIagPa2/","status":"closed","post_ids":["18139096954725065","18220905277352342"],"result":"no mayor: 1 valid vote in 48h (Athens), min 3"},{"id":"E2","title":"Stockholm Mayor duel","cities":["Stockholm"],"candidates":{"1":"@swedishbluelights","2":"@ralf_sfk_fotboll"},"open":"2026-11-14T07:00:00Z","close":"2026-11-16T07:00:00Z","url":"https://www.instagram.com/reel/DftnpbKFa3y/","status":"closed","post_ids":["17888620038689307"],"result":"@swedishbluelights 16 votes vs @ralf_sfk_fotboll 5 (21 valid)"}]};
 function pickCity(i){
   const g=geoIndex(); qEl.value=g.name[i]; qClear.hidden=false; closeResults(); qEl.blur();
   if(preview){ towns.splice(towns.indexOf(preview),1); preview=null; }
