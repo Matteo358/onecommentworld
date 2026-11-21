@@ -162,6 +162,8 @@ export class Sphere {
     this.sql.exec('DELETE FROM codes WHERE code=?', mt[1].toUpperCase());
     // PostZen DMs each person only once per automation: someone already confirmed (new phone, new day) is unlocked right away
     if ([...this.sql.exec('SELECT 1 FROM fol WHERE igid=?', String(au.id))].length) return this.unlock(String(au.id));
+    // DIRECT_UNLOCK=1 (2026-11-21): i DM di PostZen sono a plan_limit, quindi si sblocca subito dal commento (senza verifica follower)
+    if (this.env.DIRECT_UNLOCK === '1') return this.unlock(String(au.id));
     this.push(c.dev, { t: 'pend', user: '@' + user });
     return { matched: true, pending: '@' + user };
   }
