@@ -5,7 +5,7 @@
 <meta name="description" content="The first fully organic global community. One comment = one house on the map. 3265 cities and counting.">
 <link rel="icon" href="logo.png">
 <link rel="stylesheet" href="sphere.css">
-<link rel="preload" href="engine.js?v=a159d73854" as="script">
+<link rel="preload" href="engine.js?v=287dade83c" as="script">
 <link rel="preload" href="geo-coarse.bin?v=e49bd2043a" as="fetch" crossorigin>
 <link rel="preload" href="roads.bin?v=e170ff2a78" as="fetch" crossorigin>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -330,7 +330,7 @@ button.chip{font:800 12px var(--body,Figtree,system-ui,sans-serif);text-align:le
   <div class="toast" id="toast" hidden></div>
 </div>
 
-<script src="engine.js?v=a159d73854"></script>
+<script src="engine.js?v=287dade83c"></script>
 <script id="geo-alias" type="text/plain">Panama City	994
 Ciudad de Panama	994
 Nafplio	23767
@@ -3942,7 +3942,7 @@ let LAWS_DATA = {laws: [], ballots: []};
 async function loadLaws(){
   try { const d = WEB ? await (await fetch('laws.json?t=' + Math.floor(Date.now() / 6e5), {cache: 'no-store'})).json() : (window.OCW_LAWS || null); if (d) LAWS_DATA = d; } catch (e) {}
   const m = {}; for (const l of LAWS_DATA.laws || []) (m[l.city + '|' + l.cc] = m[l.city + '|' + l.cc] || []).push(l.law);
-  api.setLaws(m); dirty = true;
+  if (api.setLaws) api.setLaws(m); dirty = true;
   try { if (typeof tab !== 'undefined' && (tab === 'town' || tab === 'rules')) render(); } catch (e) {}
 }
 window.OCW_SITE={get api(){return api}, select:(id)=>select(id,true), selectName:(n)=>{const t=towns.find(t=>t.nome===n); if(t) select(t.id,true); return !!t;}, get flyA(){return flyA}, go(x,y,h){ api.set(x,y,h); dirty=true; }, setLaws(d){ window.OCW_LAWS=d; LAWS_DATA=d; return loadLaws(); }};
@@ -4125,7 +4125,7 @@ document.querySelector('.tabs').addEventListener('click',e=>{
 const LAW_CAT={
   pink:['🩷','Pink Town','Every house in the city must be painted pink.'],
   rainbow:['🌈','Rainbow Roofs','Every roof gets its own bright color.'],
-  statue:['🗽','Giant Statue','A 20 m golden statue of the founder in the main square.'],
+  statue:['🗽','Giant Statue','A 35 m golden statue of the founder in the main square.'],
   forest:['🌳','Forest Law','Every citizen plants 4 trees in their garden.'],
   nocars:['🚫','Car Ban','Cars are banned. Everybody walks.'],
 };
