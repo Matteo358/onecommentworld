@@ -3945,7 +3945,7 @@ async function loadLaws(){
   if (api.setLaws) api.setLaws(m); dirty = true;
   try { if (typeof tab !== 'undefined' && (tab === 'town' || tab === 'rules')) render(); } catch (e) {}
 }
-window.OCW_SITE={get api(){return api}, select:(id)=>select(id,true), selectName:(n)=>{const t=towns.find(t=>t.nome===n); if(t) select(t.id,true); return !!t;}, get flyA(){return flyA}, go(x,y,h){ api.set(x,y,h); dirty=true; }, setLaws(d){ window.OCW_LAWS=d; LAWS_DATA=d; return loadLaws(); }};
+window.OCW_SITE={get api(){return api}, select:(id)=>select(id,true), selectName:(n)=>{const t=towns.find(t=>t.nome===n); if(t) select(t.id,true); return !!t;}, get flyA(){return flyA}, go(x,y,h){ api.set(x,y,h); dirty=true; }, redraw(){ dirty=true; }, setLaws(d){ window.OCW_LAWS=d; LAWS_DATA=d; return loadLaws(); }};
 
 // ---------- UI ----------
 const pane=document.getElementById('pane');
@@ -4568,4 +4568,4 @@ setTimeout(()=>(window.requestIdleCallback||setTimeout)(()=>geoIndex()),5000);
 startMap().then(()=>{ const W=mapEl.clientWidth>760; api.lookAt(44,14,W?4200:9000); const v=api.view; const p=panelOffset({x:v.x,y:v.y},v.h); api.set(p.x,p.y,p.h); dirty=true; });
 requestAnimationFrame(tick);
 })();
-</script><script src="sphere.js" defer></script>
+</script><script src="otto.js" defer></script><script src="sphere.js" defer></script>
