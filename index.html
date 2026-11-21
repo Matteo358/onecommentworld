@@ -5,7 +5,7 @@
 <meta name="description" content="The first fully organic global community. One comment = one house on the map. 3265 cities and counting.">
 <link rel="icon" href="logo.png">
 <link rel="stylesheet" href="sphere.css">
-<link rel="preload" href="engine.js?v=287dade83c" as="script">
+<link rel="preload" href="engine.js?v=d6e492fbbb" as="script">
 <link rel="preload" href="geo-coarse.bin?v=e49bd2043a" as="fetch" crossorigin>
 <link rel="preload" href="roads.bin?v=e170ff2a78" as="fetch" crossorigin>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -330,7 +330,7 @@ button.chip{font:800 12px var(--body,Figtree,system-ui,sans-serif);text-align:le
   <div class="toast" id="toast" hidden></div>
 </div>
 
-<script src="engine.js?v=287dade83c"></script>
+<script src="engine.js?v=d6e492fbbb"></script>
 <script id="geo-alias" type="text/plain">Panama City	994
 Ciudad de Panama	994
 Nafplio	23767
@@ -3934,8 +3934,15 @@ async function startMap(){
       {x: t.v.cx + L.x / 1000 * t.v.k, y: t.v.cy + (L.y + 5 * L.face) / 1000 * t.v.k, h: 0.0085 * t.v.k}, {prio: M ? 4 : i === 0 ? 3 : 2, show: h => h < (M ? 0.9 : 0.45) * t.v.k, css: ' translate(-50%,-100%)'}); }); });
   if (api.alive) { api.alive.setEgg(EGG_WINNERS.map(w => w.user)); api.alive.setMayors(Object.fromEntries(towns.filter(t => t.sindaco).map(t => [t.nome, t.sindaco]))); }
   loadLaws();
+  loadLooks();
   dirty = true; mapEl.classList.add('ready');
   if (WEB) { roadsP.then(villRoads).then(() => getGz(WEB_FILES.vill)).then(villDetail); }   // prima le strade (piccole), poi alberi e campi
+}
+// Il tuo personaggio (looks.json: {"@user": {shirt, pants, hat, hatColor, pet, petColor}}, dai commenti LOOK)
+async function loadLooks(){
+  let d = null;
+  try { d = WEB ? await (await fetch('looks.json?t=' + Math.floor(Date.now() / 6e5), {cache: 'no-store'})).json() : (window.OCW_LOOKS || null); } catch (e) {}
+  if (d && api.alive && api.alive.setLooks) { api.alive.setLooks(d.looks || d); dirty = true; }
 }
 // Leggi della città (laws.json accanto al sito; nei reel da file:// si passa window.OCW_LAWS)
 let LAWS_DATA = {laws: [], ballots: []};
@@ -4071,6 +4078,9 @@ function renderRules(){
         <li>Only people with a house in that city can vote, and only for someone from the same city. One vote each, the first one counts, no voting for yourself.</li>
         <li>The election lasts 48 hours. Most votes wins (at least ${MAYOR_MIN} votes). The Mayor rules for <b>${MAYOR_TERM} days</b>, then the city votes again.</li>
       </ol>
+    </div>
+    <div class="sec"><h3>Your character</h3>
+      <p class="hint">Everyone on the map has a little person who lives in their house. Make it yours: comment <b>LOOK</b> + what you want under any reel, like <b>LOOK red shirt, black cowboy hat, dog</b>. Hats: cap, top hat, cowboy, beanie, party hat. Pets: dog or cat. Any color. Updates every 12 hours, then search your @ to follow your character.</p>
     </div>
     <div class="sec"><h3>City laws</h3>
       <p class="hint" style="margin-bottom:10px">Cities with <b>12+ houses</b> vote laws in the comments, and the law <b>really changes the map</b>. Comment just the number of your favourite law under the law post: only votes from people with a house in that city count, one vote each, at least 3 votes to pass.</p>
@@ -4568,4 +4578,4 @@ setTimeout(()=>(window.requestIdleCallback||setTimeout)(()=>geoIndex()),5000);
 startMap().then(()=>{ const W=mapEl.clientWidth>760; api.lookAt(44,14,W?4200:9000); const v=api.view; const p=panelOffset({x:v.x,y:v.y},v.h); api.set(p.x,p.y,p.h); dirty=true; });
 requestAnimationFrame(tick);
 })();
-</script><script src="otto.js" defer></script><script src="sphere.js" defer></script>
+</script><script src="sphere.js" defer></script><script src="otto.js" defer></script>
