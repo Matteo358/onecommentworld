@@ -1,7 +1,1 @@
-{
- "laws": [],
- "ballots": [
-  {"id": "L1", "options": ["pink", "nocars", "statue"], "open": "2026-11-22T18:00:00Z", "close": "2026-11-24T18:00:00Z",
-   "min_houses": 12, "post_ids": [], "url": "", "status": "open"}
- ]
-}
+{"laws": [], "ballots": [{"id": "L1", "options": ["pink", "nocars", "statue"], "open": "2026-11-22T18:00:00Z", "close": "2026-11-24T18:00:00Z", "min_houses": 12, "post_ids": ["18158894650483413"], "url": "https://www.instagram.com/reel/DgDZh6Ej5Rl/", "status": "open"}]}
