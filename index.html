@@ -5,7 +5,7 @@
 <meta name="description" content="The first fully organic global community. One comment = one house on the map. 3372 cities and counting.">
 <link rel="icon" href="logo.png">
 <link rel="stylesheet" href="sphere.css">
-<link rel="preload" href="engine.js?v=ef77fa799b" as="script">
+<link rel="preload" href="engine.js?v=b1d2ef5fc7" as="script">
 <link rel="preload" href="geo-coarse.bin?v=e49bd2043a" as="fetch" crossorigin>
 <link rel="preload" href="roads.bin?v=3fd319a45d" as="fetch" crossorigin>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -330,7 +330,7 @@ button.chip{font:800 12px var(--body,Figtree,system-ui,sans-serif);text-align:le
   <div class="toast" id="toast" hidden></div>
 </div>
 
-<script src="engine.js?v=ef77fa799b"></script>
+<script src="engine.js?v=b1d2ef5fc7"></script>
 <script id="geo-alias" type="text/plain">Panama City	994
 Ciudad de Panama	994
 Nafplio	23767
@@ -4039,7 +4039,7 @@ async function startMap(){
     if (!t.ghost) t.v.lots.forEach((L, i) => { const M = isMayor(t, L.user);   // il Mayor ha la corona sulla casa
       api.label('ocw-house' + (i === 0 ? ' f' : '') + (M ? ' m' : ''), (M ? '👑 ' : i === 0 ? '★ ' : '') + esc(L.user),
       {x: t.v.cx + L.x / 1000 * t.v.k, y: t.v.cy + (L.y + 5 * L.face) / 1000 * t.v.k, h: 0.0085 * t.v.k}, {prio: M ? 4 : i === 0 ? 3 : 2, show: h => h < (M ? 0.9 : 0.45) * t.v.k, css: ' translate(-50%,-100%)'}); }); });
-  if (api.alive) { api.alive.setEgg(EGG_WINNERS.map(w => w.user)); api.alive.setMayors(Object.fromEntries(towns.filter(t => t.sindaco).map(t => [t.nome, t.sindaco]))); }
+  if (api.alive) { api.alive.setEgg(EGG_WINNERS.map(w => w.user)); api.alive.setOtto && api.alive.setOtto(OTTO_WINNERS.map(w => w.user)); api.alive.setMayors(Object.fromEntries(towns.filter(t => t.sindaco).map(t => [t.nome, t.sindaco]))); }
   loadLaws();
   loadLooks();
   dirty = true; mapEl.classList.add('ready');
@@ -4448,7 +4448,9 @@ let preview=null;
 const EGG=null;
 const EGG_WINNERS=[{"n":1,"user":"@danyxcz_48","city":"Bělá pod Bezdězem"}];   // [{n:1,user:"@x",city:"..."}]: badge Egg Hunter
 const EGG_W=new Set(EGG_WINNERS.map(w=>w.user.toLowerCase()));
-const eggBadge=u=>EGG_W.has(String(u).toLowerCase())?' <span class="egg-b" title="Egg Hunter">🥚</span>':'';
+const OTTO_WINNERS=[{"n":1,"user":"@eduardd.gabriel","city":"Târgu Jiu"}];   // [{n:1,user:"@x",city:"..."}]: badge Otto Hunter (Find Otto)
+const OTTO_W=new Set(OTTO_WINNERS.map(w=>w.user.toLowerCase()));
+const eggBadge=u=>(EGG_W.has(String(u).toLowerCase())?' <span class="egg-b" title="Egg Hunter">🥚</span>':'')+(OTTO_W.has(String(u).toLowerCase())?' <span class="egg-b" title="Otto Hunter">🎈</span>':'');
 const eggTried=new Map(); let eggTown=null, eggData=null;
 const hexB=h=>new Uint8Array(h.match(/../g).map(x=>parseInt(x,16)));
 const eggNorm=s=>String(s).toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();
@@ -4644,6 +4646,8 @@ function renderBadges(){
     <div><div class="eyebrow">Badges</div><h2 class="town-name">Hall of fame</h2><p class="meta">Badges stay on your house forever. Tap a name to follow that person.</p></div>
     <div class="sec badge-sec"><div class="bdg egg">🥚</div><div><h3>Egg Hunter</h3><p class="hint">First to find a hidden Golden Egg on the map.</p>
       <div class="chips">${EGG_WINNERS.length ? EGG_WINNERS.map(w => chip(w.user, townOfUser(w.user), 'f', '#' + w.n)).join('') : '<span class="hint">Nobody yet.</span>'}</div></div></div>
+    <div class="sec badge-sec"><div class="bdg egg">🎈</div><div><h3>Otto Hunter</h3><p class="hint">First to find Otto, the tiny man with the yellow balloon hidden on the map. His balloon stays in your garden.</p>
+      <div class="chips">${OTTO_WINNERS.length ? OTTO_WINNERS.map(w => chip(w.user, townOfUser(w.user), 'f', '#' + w.n)).join('') : '<span class="hint">Nobody yet.</span>'}</div></div></div>
     <div class="sec badge-sec"><div class="bdg m">${CROWN}</div><div><h3>Mayor</h3><p class="hint">Voted by the citizens once a city has ${typeof MAYOR_AT !== 'undefined' ? MAYOR_AT : 30} houses.</p>
       <div class="chips">${mayorsL.length ? mayorsL.map(t => chip(t.sindaco, t, 'm', '👑')).join('') : '<span class="hint">The first elections are coming. Get your city to 30 houses.</span>'}</div></div></div>
     <div class="sec badge-sec"><div class="bdg f">★</div><div><h3>Founder</h3><p class="hint">First to comment a city. <b>${fmt(founders)} founders</b> so far. Search your @nickname to see your house.</p></div></div>
