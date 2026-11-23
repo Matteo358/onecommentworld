@@ -5,7 +5,7 @@
 <meta name="description" content="The first fully organic global community. One comment = one house on the map. 3392 cities and counting.">
 <link rel="icon" href="logo.png">
 <link rel="stylesheet" href="sphere.css">
-<link rel="preload" href="engine.js?v=b1d2ef5fc7" as="script">
+<link rel="preload" href="engine.js?v=61ab7c21ab" as="script">
 <link rel="preload" href="geo-coarse.bin?v=e49bd2043a" as="fetch" crossorigin>
 <link rel="preload" href="roads.bin?v=9c0c8283c5" as="fetch" crossorigin>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -292,6 +292,7 @@ button.chip{font:800 12px var(--body,Figtree,system-ui,sans-serif);text-align:le
 .follow[hidden],.follow-pin[hidden]{display:none}
 .callout.air{background:rgba(127,211,239,.12);border:2px solid rgba(127,211,239,.55);color:inherit}
 @media (max-width:760px){.follow{left:12px;right:62px;transform:none;max-width:none}}
+.badge-sec .bdg.b{background:#2f6fe0}
 </style>
 
 <div id="app">
@@ -330,7 +331,7 @@ button.chip{font:800 12px var(--body,Figtree,system-ui,sans-serif);text-align:le
   <div class="toast" id="toast" hidden></div>
 </div>
 
-<script src="engine.js?v=b1d2ef5fc7"></script>
+<script src="engine.js?v=61ab7c21ab"></script>
 <script id="geo-alias" type="text/plain">Panama City	994
 Ciudad de Panama	994
 Nafplio	23767
@@ -4062,6 +4063,7 @@ async function startMap(){
   if (api.alive) { api.alive.setEgg(EGG_WINNERS.map(w => w.user)); api.alive.setOtto && api.alive.setOtto(OTTO_WINNERS.map(w => w.user)); api.alive.setMayors(Object.fromEntries(towns.filter(t => t.sindaco).map(t => [t.nome, t.sindaco]))); }
   loadLaws();
   loadLooks();
+  loadBuilders();
   dirty = true; mapEl.classList.add('ready');
   if (WEB) { roadsP.then(villRoads).then(() => getGz(WEB_FILES.vill)).then(villDetail); }   // prima le strade (piccole), poi alberi e campi
 }
@@ -4070,6 +4072,15 @@ async function loadLooks(){
   let d = null;
   try { d = WEB ? await (await fetch('looks.json?t=' + Math.floor(Date.now() / 6e5), {cache: 'no-store'})).json() : (window.OCW_LOOKS || null); } catch (e) {}
   if (d && api.alive && api.alive.setLooks) { api.alive.setLooks(d.looks || d); dirty = true; }
+}
+// Builder (builders.json accanto al sito, dai commenti "[città] from @tu"): bandiera blu ai primi 10
+let BUILDERS = {board: []};
+async function loadBuilders(){
+  let d = null;
+  try { d = WEB ? await (await fetch('builders.json?t=' + Math.floor(Date.now() / 6e5), {cache: 'no-store'})).json() : (window.OCW_BUILDERS || null); } catch (e) {}
+  if (d && d.board) BUILDERS = d;
+  if (api.alive && api.alive.setBuilders) { api.alive.setBuilders(BUILDERS.board.filter(b => b.n > 0).slice(0, 10).map(b => b.user)); dirty = true; }
+  try { if (typeof tab !== 'undefined' && tab === 'badges') render(); } catch (e) {}
 }
 // Leggi della città (laws.json accanto al sito; nei reel da file:// si passa window.OCW_LAWS)
 let LAWS_DATA = {laws: [], ballots: []};
@@ -4672,11 +4683,142 @@ function renderBadges(){
       <div class="chips">${mayorsL.length ? mayorsL.map(t => chip(t.sindaco, t, 'm', '👑')).join('') : '<span class="hint">The first elections are coming. Get your city to 30 houses.</span>'}</div></div></div>
     <div class="sec badge-sec"><div class="bdg f">★</div><div><h3>Founder</h3><p class="hint">First to comment a city. <b>${fmt(founders)} founders</b> so far. Search your @nickname to see your house.</p></div></div>
     <div class="sec badge-sec soon"><div class="bdg">✈️</div><div><h3>Globetrotter <small>soon</small></h3><p class="hint">For the citizens of the airport city who visit the most cities.</p></div></div>
-    <div class="sec badge-sec soon"><div class="bdg">🏗️</div><div><h3>Builder <small>soon</small></h3><p class="hint">For whoever brings the most neighbours to their city.</p></div></div>`;
+    <div class="sec badge-sec"><div class="bdg b">🏗️</div><div><h3>Builder</h3><p class="hint">Bring people to your city. Your friend comments <b>their city + from @you</b> under any reel (like <b>Bucharest from @maria</b>). Each new neighbour = 1 point. The top 10 get a <b>blue flag</b> on their house.</p>
+      <div class="chips">${BUILDERS.board.length ? BUILDERS.board.slice(0, 10).map((b, k) => chip(b.user, townOfUser(b.user), 'f', '#' + (k + 1) + ' · ' + b.n + ' 🏗️')).join('') : '<span class="hint">Nobody yet. Be the first: send the map to a friend.</span>'}</div></div></div>`;
   pane.querySelectorAll('.chip.tap').forEach(c => c.onclick = () => followUser(c.dataset.u, byId(+c.dataset.t) || townOfUser(c.dataset.u)));
 }
 render = (orig => function(){ if (tab === 'badges') return renderBadges(); orig(); })(render);
 window.OCW_SITE_X = {towns: () => towns, follow: (u) => followUser(u), where: () => api && api.alive && api.alive.where()};
+
+// ---------- "Share my house": cartolina 9:16 per le storie + link diretto ?u=nickname (test condivisioni dal 2026-11-23) ----------
+// Usa: follow / followUser / followEl (site_alive.js), api, mapEl, towns, realTowns, toast, esc, fmt.
+(function(){
+const SITE = location.origin + location.pathname;
+const linkOf = u => SITE + '?u=' + encodeURIComponent(String(u).replace(/^@/, ''));
+const css = document.createElement('style');
+css.textContent = `.follow .f-share{border:2px solid #10232b;background:var(--sun,#ffcf3f);border-radius:10px;height:32px;padding:0 10px;font:800 13px/1 Figtree,system-ui,sans-serif;cursor:pointer;flex:none;color:#10232b;box-shadow:0 2px 0 rgba(16,35,43,.3)}
+.shr{position:fixed;inset:0;z-index:60;background:rgba(10,22,28,.72);display:flex;align-items:center;justify-content:center;padding:16px}
+.shr[hidden]{display:none}
+.shr-box{background:#fff;border:2px solid #10232b;border-radius:18px;padding:14px;max-width:380px;width:100%;max-height:calc(100% - 8px);display:flex;flex-direction:column;gap:10px;font:600 14px/1.3 Figtree,system-ui,sans-serif;color:#10232b}
+.shr-box img{width:100%;min-height:0;flex:1 1 auto;object-fit:contain;border-radius:12px;background:#10232b;max-height:58vh}
+.shr-box h3{margin:0;font:400 20px/1.1 var(--display,system-ui)}
+.shr-row{display:flex;gap:8px;flex-wrap:wrap}
+.shr-row button{flex:1 1 30%;min-height:44px;border:2px solid #10232b;border-radius:12px;background:#eef3f5;font:800 14px/1 Figtree,system-ui,sans-serif;color:#10232b;cursor:pointer}
+.shr-row button.go{background:var(--sun,#ffcf3f);box-shadow:0 3px 0 #b58c12}
+.shr-box p{margin:0;color:#3b5560;font-weight:600;font-size:13px}`;
+document.head.appendChild(css);
+
+// tasto Share nella scheda "segui"
+const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'f-share'; btn.textContent = '📤 Share';
+followEl.insertBefore(btn, followEl.querySelector('.f-x'));
+btn.onclick = () => { if (follow) openShare(follow.u, follow.t); };
+
+const modal = document.createElement('div'); modal.className = 'shr'; modal.hidden = true;
+modal.innerHTML = `<div class="shr-box" role="dialog" aria-modal="true" aria-label="Share your house"><h3>Your house card</h3><img alt="Your house on One Comment World"><p>Post it on your story and tag <b>@onecommentworld</b>. Friends who comment their city + <b>from @you</b> make you a Builder.</p><div class="shr-row"><button type="button" class="go" data-a="share">Share</button><button type="button" data-a="save">Save image</button><button type="button" data-a="link">Copy link</button></div><div class="shr-row"><button type="button" data-a="close">Close</button></div></div>`;
+document.body.appendChild(modal);
+let cur = null;
+modal.addEventListener('click', async e => {
+  if (e.target === modal) { modal.hidden = true; return; }
+  const a = e.target.closest('button') && e.target.closest('button').dataset.a; if (!a || !cur) return;
+  if (a === 'close') { modal.hidden = true; return; }
+  if (a === 'link') { copy(cur.link); return; }
+  if (a === 'save') { save(cur); return; }
+  if (a === 'share') {
+    const file = new File([cur.blob], cur.name, {type: 'image/png'});
+    try {
+      if (navigator.canShare && navigator.canShare({files: [file]})) { await navigator.share({files: [file], text: cur.text}); return; }
+      if (navigator.share) { await navigator.share({text: cur.text, url: cur.link}); return; }
+    } catch (err) { if (err && err.name === 'AbortError') return; }
+    save(cur); copy(cur.link);
+  }
+});
+function copy(t){ (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast('Link copied. Paste it anywhere.'), () => toast(t)); }
+function save(c){ const a = document.createElement('a'); a.href = c.url; a.download = c.name; document.body.appendChild(a); a.click(); a.remove(); toast('Image saved. Post it on your story and tag @onecommentworld.'); }
+
+function stats(u, t){
+  const all = realTowns().slice().sort((a, b) => b.abitanti - a.abitanti);
+  const wr = all.indexOf(t) + 1;
+  const cn = all.filter(x => x.regione === t.regione), cr = cn.indexOf(t) + 1;
+  const above = wr > 1 ? all[wr - 2] : null;
+  const L = t.v.lots, idx = L.findIndex(l => l.user.toLowerCase() === String(u).toLowerCase());
+  return {wr, cr, cn: cn.length, above, house: idx + 1, founder: idx === 0, n: t.abitanti};
+}
+function wrap(x, txt, maxW){ const w = txt.split(' '), out = []; let l = ''; for (const s of w) { const t2 = l ? l + ' ' + s : s; if (x.measureText(t2).width > maxW && l) { out.push(l); l = s; } else l = t2; } if (l) out.push(l); return out; }
+function rr(x, X, Y, W, H, R){ x.beginPath(); x.moveTo(X + R, Y); x.arcTo(X + W, Y, X + W, Y + H, R); x.arcTo(X + W, Y + H, X, Y + H, R); x.arcTo(X, Y + H, X, Y, R); x.arcTo(X, Y, X + W, Y, R); x.closePath(); }
+const loadImg = src => new Promise(ok => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = src; });
+
+async function openShare(u, t){
+  if (!t || !t.v) return;
+  if (document.fonts) { try { await Promise.all(['400 60px "Lilita One"', '800 40px Figtree', '600 40px Figtree'].map(f => document.fonts.load(f))); } catch (e) {} }
+  // foto della mappa: si ridisegna e si copia subito (il canvas WebGL non tiene il buffer)
+  const v = api.view, keep = {x: v.x, y: v.y, h: v.h};
+  const L0 = t.v.lots.find(l => l.user.toLowerCase() === String(u).toLowerCase()) || t.v.lots[0];
+  const hx = t.v.cx + L0.x / 1000 * t.v.k, hy = t.v.cy + L0.y / 1000 * t.v.k;
+  api.set(hx, hy, 0.14 * t.v.k); if (api.alive) api.alive.step(performance.now() / 1000); api.render();
+  const src = mapEl.querySelector('canvas'); let pin = null;
+  try { const [sx, sy, z] = api.project(hx, hy, 0.004 * t.v.k); if (z < 1) pin = [sx / mapEl.clientWidth, sy / mapEl.clientHeight]; } catch (e) {}
+  const snap = document.createElement('canvas'); snap.width = src ? src.width : 1; snap.height = src ? src.height : 1; if (src) snap.getContext('2d').drawImage(src, 0, 0);
+  api.set(keep.x, keep.y, keep.h); dirty = true;
+  const W = 1080, H = 1920, c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+  x.fillStyle = '#2c6e8a'; x.fillRect(0, 0, W, H);
+  const MY = 450, MH = 860;
+  let pinX = W / 2, pinY = MY + MH / 2;
+  if (src && src.width) { const sw = snap.width, sh = snap.height, s = Math.max(W / sw, MH / sh), dw = sw * s, dh = sh * s, ox = (W - dw) / 2, oy = MY + (MH - dh) / 2;
+    x.save(); x.beginPath(); x.rect(0, MY, W, MH); x.clip(); x.drawImage(snap, ox, oy, dw, dh); x.restore();
+    if (pin) { pinX = ox + pin[0] * dw; pinY = oy + pin[1] * dh; } }
+  pinX = Math.max(160, Math.min(W - 160, pinX)); pinY = Math.max(MY + 120, Math.min(MY + MH - 120, pinY));
+  // pin sulla casa (la camera la tiene al centro della mappa visibile)
+  const st = stats(u, t);
+  const grad = x.createLinearGradient(0, 0, 0, MY + 120); grad.addColorStop(0, '#10232b'); grad.addColorStop(1, 'rgba(16,35,43,0)'); x.fillStyle = grad; x.fillRect(0, 0, W, MY + 120);
+  const g2 = x.createLinearGradient(0, MY + MH - 160, 0, H); g2.addColorStop(0, 'rgba(16,35,43,0)'); g2.addColorStop(0.35, '#10232b'); x.fillStyle = g2; x.fillRect(0, MY + MH - 160, W, H);
+  // testata: logo + nome
+  const logo = await loadImg(document.getElementById('brand-logo').src);
+  if (logo) { x.save(); x.beginPath(); x.arc(110, 120, 52, 0, Math.PI * 2); x.clip(); x.drawImage(logo, 58, 68, 104, 104); x.restore(); x.lineWidth = 6; x.strokeStyle = '#ffcf3f'; x.beginPath(); x.arc(110, 120, 52, 0, Math.PI * 2); x.stroke(); }
+  x.fillStyle = '#ffffff'; x.font = '400 50px "Lilita One", system-ui'; x.textBaseline = 'middle'; x.fillText('ONE COMMENT WORLD', 185, 108);
+  x.fillStyle = '#ffcf3f'; x.font = '800 30px Figtree, system-ui'; x.fillText('A world built by comments', 187, 152);
+  // titolo
+  x.textBaseline = 'alphabetic'; x.fillStyle = '#ffffff'; x.font = '400 92px "Lilita One", system-ui';
+  const head = st.founder ? 'I founded ' + t.nome : 'I live in ' + t.nome;
+  let fs = 92; while (x.measureText(head).width > W - 120 && fs > 50) { fs -= 4; x.font = `400 ${fs}px "Lilita One", system-ui`; }
+  x.fillText(head, 60, 330);
+  x.font = '800 40px Figtree, system-ui'; x.fillStyle = '#ffcf3f'; x.fillText(u + (st.founder ? ' · ★ Founder' : ' · house #' + st.house), 62, 395);
+  // pin
+  x.fillStyle = '#ffcf3f'; x.strokeStyle = '#10232b'; x.lineWidth = 6; x.font = '800 36px Figtree, system-ui';
+  const pw = x.measureText(u).width + 44, px = pinX - pw / 2, py = pinY - 92; rr(x, px, py, pw, 62, 31); x.fill(); x.stroke();
+  x.beginPath(); x.moveTo(pinX - 16, py + 60); x.lineTo(pinX, py + 86); x.lineTo(pinX + 16, py + 60); x.fill(); x.stroke();
+  x.fillStyle = '#10232b'; x.fillText(u, px + 22, py + 44);
+  // numeri
+  const boxY = MY + MH - 20, bw = (W - 60 * 2 - 30) / 2;
+  const box = (X, big, small) => { x.fillStyle = '#ffffff'; rr(x, X, boxY, bw, 190, 26); x.fill(); x.fillStyle = '#10232b'; x.font = '400 84px "Lilita One", system-ui'; x.fillText(big, X + 30, boxY + 100); x.font = '800 30px Figtree, system-ui'; x.fillStyle = '#3b5560'; x.fillText(small, X + 32, boxY + 150); };
+  box(60, fmt(st.n), st.n === 1 ? 'house in ' + short(t.nome) : 'houses in ' + short(t.nome));
+  box(60 + bw + 30, '#' + st.wr, 'city in the world');
+  // obiettivo e chiamata
+  x.font = '800 44px Figtree, system-ui'; x.fillStyle = '#ffffff';
+  const goal = st.above ? `${st.above.abitanti - st.n + 1} more houses and ${t.nome} passes ${st.above.nome}.` : `${t.nome} is #1 in the world. Keep it that way.`;
+  let y = boxY + 290; for (const l of wrap(x, goal, W - 120)) { x.fillText(l, 60, y); y += 56; }
+  x.font = '600 38px Figtree, system-ui'; x.fillStyle = '#cfe3ea'; y += 14;
+  for (const l of wrap(x, `Live in ${t.nome}? Comment "${t.nome} from ${u}" under any @onecommentworld reel.`, W - 120)) { x.fillText(l, 60, y); y += 50; }
+  x.fillStyle = '#ffcf3f'; x.font = '800 34px Figtree, system-ui'; x.fillText('Find my house: link in bio @onecommentworld', 60, Math.max(H - 60, y + 20));
+  const blob = await new Promise(ok => c.toBlob(ok, 'image/png'));
+  if (!blob) { toast('Could not make the image on this device. Copy the link instead.'); copy(linkOf(u)); return; }
+  if (cur && cur.url) URL.revokeObjectURL(cur.url);
+  const name = 'my-house-' + t.nome.replace(/[^\w]+/g, '-').toLowerCase() + '.png';
+  cur = {blob, url: URL.createObjectURL(blob), name, link: linkOf(u), text: `${head} on One Comment World 🏡 Find my house: ${linkOf(u)}`};
+  modal.querySelector('img').src = cur.url; modal.hidden = false;
+}
+function short(n){ return n.length > 14 ? n.slice(0, 13) + '…' : n; }
+
+// link diretto: ?u=nickname apre la mappa sulla casa e segue il personaggio
+const QU = new URLSearchParams(location.search).get('u');
+if (QU) { const t0 = Date.now(); const wait = () => {
+  if (Date.now() - t0 > 40000) return;
+  if (!api || !mapEl.classList.contains('ready')) { setTimeout(wait, 400); return; }
+  const t = townOfUser(QU.startsWith('@') ? QU : '@' + QU) || townOfUser(QU);
+  if (!t) { if (Date.now() - t0 > 20000) toast('No house for @' + QU.replace(/^@/, '') + ' yet. Comment your city under the latest reel.'); else setTimeout(wait, 600); return; }
+  setTimeout(() => followUser(t.v.lots.find(l => l.user.toLowerCase().replace(/^@/, '') === QU.toLowerCase().replace(/^@/, '')).user, t), 900);
+}; wait(); }
+window.OCW_SHARE = {open: (u) => { const t = townOfUser(u); if (t) openShare(t.v.lots.find(l => l.user.toLowerCase() === u.toLowerCase()).user, t); }};
+})();
 
 const MAYORS={"mayors":[{"city":"Stockholm","cc":"SE","user":"@swedishbluelights","votes":16,"voters":21,"since":"2026-11-16","until":"2026-12-16","election":"E2"}],"elections":[{"id":"E1","title":"First Mayor election","cities":"auto","open":"2026-11-10T18:00:00Z","close":"2026-11-12T18:00:00Z","url":"https://www.instagram.com/reel/DfkgAIagPa2/","status":"closed","post_ids":["18139096954725065","18220905277352342"],"result":"no mayor: 1 valid vote in 48h (Athens), min 3"},{"id":"E2","title":"Stockholm Mayor duel","cities":["Stockholm"],"candidates":{"1":"@swedishbluelights","2":"@ralf_sfk_fotboll"},"open":"2026-11-14T07:00:00Z","close":"2026-11-16T07:00:00Z","url":"https://www.instagram.com/reel/DftnpbKFa3y/","status":"closed","post_ids":["17888620038689307"],"result":"@swedishbluelights 16 votes vs @ralf_sfk_fotboll 5 (21 valid)"},{"id":"E3","title":"Sofia Mayor duel","cities":["Sofia"],"candidates":{"1":"@_g.tatarov","2":"@_.boychinowww._"},"open":"2026-11-20T18:00:00Z","close":"2026-11-22T18:00:00Z","url":"https://www.instagram.com/reel/Df-P7-QEXLJ/","status":"open","post_ids":["18137946331670470"]}]};
 function pickCity(i){
