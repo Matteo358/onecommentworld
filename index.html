@@ -4468,7 +4468,7 @@ let preview=null;
 const EGG=null;
 const EGG_WINNERS=[{"n":1,"user":"@danyxcz_48","city":"Bělá pod Bezdězem"}];   // [{n:1,user:"@x",city:"..."}]: badge Egg Hunter
 const EGG_W=new Set(EGG_WINNERS.map(w=>w.user.toLowerCase()));
-const OTTO_WINNERS=[{"n":1,"user":"@eduardd.gabriel","city":"Târgu Jiu"}];   // [{n:1,user:"@x",city:"..."}]: badge Otto Hunter (Find Otto)
+const OTTO_WINNERS=[{"n": 1, "user": "@eduardd.gabriel", "city": "Târgu Jiu"}, {"n": 1, "user": "@ivanrajsp23", "city": "Bačka Palanka"}];   // [{n:1,user:"@x",city:"..."}]: badge Otto Hunter (Find Otto)
 const OTTO_W=new Set(OTTO_WINNERS.map(w=>w.user.toLowerCase()));
 const eggBadge=u=>(EGG_W.has(String(u).toLowerCase())?' <span class="egg-b" title="Egg Hunter">🥚</span>':'')+(OTTO_W.has(String(u).toLowerCase())?' <span class="egg-b" title="Otto Hunter">🎈</span>':'');
 const eggTried=new Map(); let eggTown=null, eggData=null;
