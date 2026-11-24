@@ -1,11 +1,16 @@
 {
 "since": "2026-11-23",
-"updated": "2026-11-24T03:38Z",
+"updated": "2026-11-24T15:37Z",
 "board": [
 {
 "user": "@deagle472",
 "city": "Bucharest",
-"n": 1
+"n": 6
+},
+{
+"user": "@zsprung19",
+"city": "Vatican City",
+"n": 2
 }
 ]
 }
