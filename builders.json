@@ -1,6 +1,6 @@
 {
 "since": "2026-11-23",
-"updated": "2026-11-27T15:39Z",
+"updated": "2026-11-28T03:38Z",
 "board": [
 {
 "user": "@deagle472",
@@ -11,6 +11,11 @@
 "user": "@zsprung19",
 "city": "Vatican City",
 "n": 4
+},
+{
+"user": "@bulc.andrei",
+"city": "Oradea",
+"n": 1
 }
 ]
 }
